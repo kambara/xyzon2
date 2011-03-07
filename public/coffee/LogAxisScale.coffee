@@ -1,6 +1,6 @@
 class LogAxisScale extends AxisScale
   constructor: (thick, scaleMode, unit) ->
-    super(this, thick, scaleMode, unit)
+    super(thick, scaleMode, unit)
 
   getLogPos: (value, range) ->
     (Math.log(value) - range.getLogFirst()) *

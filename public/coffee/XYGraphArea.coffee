@@ -202,12 +202,12 @@ class XYGraphArea
         @setCurrentAxisRange(ranges.xAxisRange, ranges.yAxisRange)
 
   adjustGraphItems: ->
-    $.each(@graphItems, (i, item) =>
+    self = this
+    for item in @graphItems
       item.animateMoveTo(
         @calcXCoord(item.getAxisValue(@xAxis.axisType)),
         @calcYCoord(item.getAxisValue(@yAxis.axisType))
       )
-    )
 
   calcXValue: (x) ->
     if @xAxis.isLogScale()
@@ -233,28 +233,28 @@ class XYGraphArea
     if @xAxis.isLogScale()
       Math.round(
         @width *
-          (Math.log(value) -
-            @xCurrentAxisRange.getLogFirst()) /
-              @xCurrentAxisRange.getLogDifference())
+        (Math.log(value) - @xCurrentAxisRange.getLogFirst()) /
+        @xCurrentAxisRange.getLogDifference()
+      )
     else
       Math.round(
         @width *
-          (value - @xCurrentAxisRange.first) /
-            @xCurrentAxisRange.getDifference())
+        (value - @xCurrentAxisRange.first) /
+        @xCurrentAxisRange.getDifference()
+      )
 
   calcYCoord: (value) ->
     if @yAxis.isLogScale()
       Math.round(
         @height *
-          (Math.log(value) -
-            @yCurrentAxisRange.getLogFirst()) /
-              @yCurrentAxisRange.getLogDifference()
+        (Math.log(value) - @yCurrentAxisRange.getLogFirst()) /
+        @yCurrentAxisRange.getLogDifference()
       )
     else
       Math.round(
         @height *
-          (value - @yCurrentAxisRange.first) /
-            @yCurrentAxisRange.getDifference()
+        (value - @yCurrentAxisRange.first) /
+        @yCurrentAxisRange.getDifference()
       )
 
   appendItem: (itemXmlElem) ->

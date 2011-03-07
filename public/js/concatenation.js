@@ -360,7 +360,7 @@
   LogAxisScale = (function() {
     __extends(LogAxisScale, AxisScale);
     function LogAxisScale(thick, scaleMode, unit) {
-      LogAxisScale.__super__.constructor.call(this, this, thick, scaleMode, unit);
+      LogAxisScale.__super__.constructor.call(this, thick, scaleMode, unit);
     }
     LogAxisScale.prototype.getLogPos = function(value, range) {
       return (Math.log(value) - range.getLogFirst()) * this.getScaleLength() / range.getLogDifference();
@@ -755,9 +755,15 @@
       }
     };
     XYGraphArea.prototype.adjustGraphItems = function() {
-      return $.each(this.graphItems, __bind(function(i, item) {
-        return item.animateMoveTo(this.calcXCoord(item.getAxisValue(this.xAxis.axisType)), this.calcYCoord(item.getAxisValue(this.yAxis.axisType)));
-      }, this));
+      var item, self, _i, _len, _ref, _results;
+      self = this;
+      _ref = this.graphItems;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        item = _ref[_i];
+        _results.push(item.animateMoveTo(this.calcXCoord(item.getAxisValue(this.xAxis.axisType)), this.calcYCoord(item.getAxisValue(this.yAxis.axisType))));
+      }
+      return _results;
     };
     XYGraphArea.prototype.calcXValue = function(x) {
       if (this.xAxis.isLogScale()) {

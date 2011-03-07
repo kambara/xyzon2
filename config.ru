@@ -1,5 +1,4 @@
 require 'appengine-rack'
-require 'config/settings'
 
 Dir["./app/**/*.rb"].each {|file|
   require file

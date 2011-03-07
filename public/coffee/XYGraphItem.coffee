@@ -2,7 +2,7 @@ class XYGraphItem
   constructor: (itemElem) ->
     @item = $(itemElem)
     @tipIsActive = true
-    @image = @createImage()
+    @initImage() ## @bubble @image @triangle @caption
 
   getAxisValue: (axisType) ->
     switch(axisType)
@@ -19,6 +19,9 @@ class XYGraphItem
       else
         $.log "No such AxisType: " + axisType
 
+  #
+  # 各種値
+  #
   getProductName: ->
     @item.find("ProductName").eq(0).text()
 
@@ -102,9 +105,9 @@ class XYGraphItem
   getImageScale: ->
     score = @getTotalScoreAve()
     if score
-      score / 5
+      (score*score) / (5*5)
     else
-      2.5 / 5
+      (2.5*2.5) / (5*5)
 
   getReviewComments: ->
     comments = []
@@ -117,67 +120,83 @@ class XYGraphItem
     )
     comments
 
-  createImage: ->
+  #
+  # 画像
+  #
+  initImage: ->
     self = this
-    thumb = @getLargeImageInfo()
-    w = Math.round(thumb.width  * self.getImageScale())
-    h = Math.round(thumb.height * self.getImageScale())
+    thumb = @getMediumImageInfo()
+    w = Math.round(thumb.width  * @getImageScale())
+    h = Math.round(thumb.height * @getImageScale())
+    z = @getZIndex()
+    borderColor = '#666'
 
-    container = $('<div/>').css({
+    @bubble = $('<div/>').css({
       position: 'absolute',
       left: 0,
       top: 0,
-
-      'z-index': self.getZIndex()
-      width: 100
+      'z-index': z
       'line-height': 0
-#        height: h
-#        width: '100px'
-#        overflow: 'hidden'
     })
 
-    @img = $('<img/>').attr({
+    @image = $('<img/>').attr({
       src: thumb.url
     }).css({
       width: w
       height: h
-      border: '1px solid #777'
+      border: '1px solid ' + borderColor
       padding: 2
       'border-radius': 5
       'background-color': '#FFF'
       cursor: 'pointer'
-    }).appendTo(container)
-
-    @img.mouseover( ->
-      self.onMouseover()
-    ).mouseout( ->
-      self.onMouseout()
-    ).mousedown( (event) ->
-      self.onMousedown(event)
-    ).mousemove( (event) ->
+    }).mouseover( =>
+      @onMouseover()
+    ).mouseout( =>
+      @onMouseout()
+    ).mousedown( (event) =>
+      @onMousedown(event)
+    ).mousemove( (event) =>
       event.preventDefault()
-    )
+    ).appendTo(@bubble)
 
-    $('<div/>').css({
+    ## 吹出し
+    @triangle = $('<div/>').css({
       width: 0
       height: 0
       'margin-left': 10
-      'border-top':   '8px solid #777'
+      'border-top':   '8px solid ' + borderColor
       'border-left':  '5px solid transparent'
       'border-right': '5px solid transparent'
-    }).appendTo(container)
+    }).appendTo(@bubble)
 
-    @title = $("<div/>").text(
+    ## テキスト
+    @caption = $("<div/>").text(
       @getProductName()
     ).css({
-      padding: '3px 6px'
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      'z-index': 0
+      padding: '3px 8px'
       width: 130
       color: self.getTextColor()
+      'border': '2px solid #FFF'
+      'border-radius': 6
+      'background-color': '#EEE'
       'font-size': '80%'
       'line-height': '1em'
-    }).appendTo(container)
+    })
 
-    container
+  onMouseover: ->
+    @highlight()
+
+  onMouseout: ->
+    @offlight()
+
+  onMousedown: (event) ->
+    event.stopPropagation()
+    delete @detail if (@detail)
+    @detail = new XYGraphDetail(this)
 
   getTextColor: ->
     scale = Math.floor(0xFF * (1 - @getImageScale()))
@@ -185,22 +204,27 @@ class XYGraphItem
     '#' + color.toString(16)
 
   highlight: ->
-    @image.css({
-        "z-index": 2000
+    @bubble.css({
+      'z-index': 2000
     })
-    @title.css({
-        "background-color": "#FF9933"
+    @caption.css({
+      'z-index': 2000
+      'background-color': "#FF9933"
     })
 
   offlight: ->
     self = this
-    @image.css({
-        "z-index": self.getZIndex()
+    @bubble.css({
+      "z-index": self.getZIndex()
     })
-    @title.css({
-        "background-color": 'transparent'
+    @caption.css({
+      'z-index': 0
+      'background-color': '#EEE'
     })
 
+  #
+  # Tip
+  #
   activateTip: ->
     @tipIsActive = true
     @image.css({
@@ -221,7 +245,7 @@ class XYGraphItem
     @detail.fadeoutAndRemove() if @detail
 
   isTipRight: ->
-    (@image.offset().left < 400)
+    (@bubble.offset().left < 400)
 
   createTip: -> # Summary tip while mouseover
     self = this
@@ -269,78 +293,52 @@ class XYGraphItem
             + 100 * (15 - @getPvRankingLog())/15
     )
 
-#  appendTo: (container) -> # obsolete
-#    container.append(@image)
-
   render: (container) ->
-    $(container).append(@image)
+    $(container).append(@bubble)
+    $(container).append(@caption)
 
   show: ->
-    @image.show()
+    @bubble.show()
 
   hide: ->
-    @image.hide()
+    @bubble.hide()
 
   moveTo: (x, y) ->
-    @image.css({
-        left: x,
-        top: y
+    self = this
+    @bubble.css({
+      left: self.getBubbleLeft(x),
+      top:  self.getBubbleTop(y)
+    })
+    @moveCaptionTo(x, y)
+
+  moveCaptionTo: (x, y) ->
+    self = this
+    @caption.css({
+      left: self.getCaptionLeft(x)
+      top:  self.getCaptionTop(y)
     })
 
   animateMoveTo: (x, y) ->
-    @_x = x
-    @_y = y
     self = this
-    @image.stop()
-    @image.animate({
-      left: x
-      top: y
+    @bubble.stop()
+    @bubble.animate({
+      left: self.getBubbleLeft(x)
+      top:  self.getBubbleTop(y)
     }, {
       duration: "fast",
-      complete: ->
-        ##self.moveRandom()
+      complete: =>
+        @moveCaptionTo(x, y)
     })
 
-  moveRandom: ->
-    self = this
-    setTimeout(
-      (-> self.moveRandomLeft()),
-      1000 + Math.random() * 5000)
+  getBubbleLeft: (x) ->
+    ## triangle の margin-left + width/2
+    x - (10 + 5)
 
-  moveRandomLeft: ->
-    self = this
-    @image.animate({
-        left: @_x - self.image.width() * Math.random(),
-        top: @_y - self.image.height() * Math.random()
-    }, {
-        duration: "slow",
-        complete: ->
-            setTimeout(
-              (-> self.moveRandomRight()),
-              1000 + Math.random() * 4000)
-    })
+  getBubbleTop: (y) ->
+    y - @bubble.height()
 
-  moveRandomRight: ->
-    self = this
-    @image.animate({
-        left: @_x,
-        top: @_y
-    }, {
-        duration: "slow",
-        complete: ->
-            setTimeout(
-              (-> self.moveRandomLeft()),
-              1000 + Math.random() * 4000)
-    })
+  getCaptionLeft: (x) ->
+    x - (10 + 5)
 
-  onMouseover: ->
-    @highlight()
-
-  onMouseout: ->
-    @offlight()
-
-  onMousedown: (event) ->
-    event.stopPropagation()
-    if (@detail)
-        delete @detail
-    @detail = new XYGraphDetail(this)
+  getCaptionTop: (y) ->
+    y

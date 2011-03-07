@@ -1043,7 +1043,7 @@
     function XYGraphItem(itemElem) {
       this.item = $(itemElem);
       this.tipIsActive = true;
-      this.image = this.createImage();
+      this.initImage();
     }
     XYGraphItem.prototype.getAxisValue = function(axisType) {
       switch (axisType) {
@@ -1157,9 +1157,9 @@
       var score;
       score = this.getTotalScoreAve();
       if (score) {
-        return score / 5;
+        return (score * score) / (5 * 5);
       } else {
-        return 2.5 / 5;
+        return (2.5 * 2.5) / (5 * 5);
       }
     };
     XYGraphItem.prototype.getReviewComments = function() {
@@ -1174,56 +1174,75 @@
       });
       return comments;
     };
-    XYGraphItem.prototype.createImage = function() {
-      var container, h, self, thumb, w;
+    XYGraphItem.prototype.initImage = function() {
+      var borderColor, h, self, thumb, w, z;
       self = this;
-      thumb = this.getLargeImageInfo();
-      w = Math.round(thumb.width * self.getImageScale());
-      h = Math.round(thumb.height * self.getImageScale());
-      container = $('<div/>').css({
+      thumb = this.getMediumImageInfo();
+      w = Math.round(thumb.width * this.getImageScale());
+      h = Math.round(thumb.height * this.getImageScale());
+      z = this.getZIndex();
+      borderColor = '#666';
+      this.bubble = $('<div/>').css({
         position: 'absolute',
         left: 0,
         top: 0,
-        'z-index': self.getZIndex(),
-        width: 100,
+        'z-index': z,
         'line-height': 0
       });
-      this.img = $('<img/>').attr({
+      this.image = $('<img/>').attr({
         src: thumb.url
       }).css({
         width: w,
         height: h,
-        border: '1px solid #777',
+        border: '1px solid ' + borderColor,
         padding: 2,
         'border-radius': 5,
         'background-color': '#FFF',
         cursor: 'pointer'
-      }).appendTo(container);
-      this.img.mouseover(function() {
-        return self.onMouseover();
-      }).mouseout(function() {
-        return self.onMouseout();
-      }).mousedown(function(event) {
-        return self.onMousedown(event);
-      }).mousemove(function(event) {
+      }).mouseover(__bind(function() {
+        return this.onMouseover();
+      }, this)).mouseout(__bind(function() {
+        return this.onMouseout();
+      }, this)).mousedown(__bind(function(event) {
+        return this.onMousedown(event);
+      }, this)).mousemove(__bind(function(event) {
         return event.preventDefault();
-      });
-      $('<div/>').css({
+      }, this)).appendTo(this.bubble);
+      this.triangle = $('<div/>').css({
         width: 0,
         height: 0,
         'margin-left': 10,
-        'border-top': '8px solid #777',
+        'border-top': '8px solid ' + borderColor,
         'border-left': '5px solid transparent',
         'border-right': '5px solid transparent'
-      }).appendTo(container);
-      this.title = $("<div/>").text(this.getProductName()).css({
-        padding: '3px 6px',
+      }).appendTo(this.bubble);
+      return this.caption = $("<div/>").text(this.getProductName()).css({
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        'z-index': 0,
+        padding: '3px 8px',
         width: 130,
         color: self.getTextColor(),
+        'border': '2px solid #FFF',
+        'border-radius': 6,
+        'background-color': '#EEE',
         'font-size': '80%',
         'line-height': '1em'
-      }).appendTo(container);
-      return container;
+      });
+    };
+    XYGraphItem.prototype.onMouseover = function() {
+      return this.highlight();
+    };
+    XYGraphItem.prototype.onMouseout = function() {
+      return this.offlight();
+    };
+    XYGraphItem.prototype.onMousedown = function(event) {
+      event.stopPropagation();
+      if (this.detail) {
+        delete this.detail;
+      }
+      return this.detail = new XYGraphDetail(this);
     };
     XYGraphItem.prototype.getTextColor = function() {
       var color, scale;
@@ -1232,21 +1251,23 @@
       return '#' + color.toString(16);
     };
     XYGraphItem.prototype.highlight = function() {
-      this.image.css({
-        "z-index": 2000
+      this.bubble.css({
+        'z-index': 2000
       });
-      return this.title.css({
-        "background-color": "#FF9933"
+      return this.caption.css({
+        'z-index': 2000,
+        'background-color': "#FF9933"
       });
     };
     XYGraphItem.prototype.offlight = function() {
       var self;
       self = this;
-      this.image.css({
+      this.bubble.css({
         "z-index": self.getZIndex()
       });
-      return this.title.css({
-        "background-color": 'transparent'
+      return this.caption.css({
+        'z-index': 0,
+        'background-color': '#EEE'
       });
     };
     XYGraphItem.prototype.activateTip = function() {
@@ -1273,7 +1294,7 @@
       }
     };
     XYGraphItem.prototype.isTipRight = function() {
-      return this.image.offset().left < 400;
+      return this.bubble.offset().left < 400;
     };
     XYGraphItem.prototype.createTip = function() {
       var isRight, self, summaryHtml;
@@ -1321,83 +1342,57 @@
       return Math.round(1000 * this.getImageScale(), +100 * (15 - this.getPvRankingLog()) / 15);
     };
     XYGraphItem.prototype.render = function(container) {
-      return $(container).append(this.image);
+      $(container).append(this.bubble);
+      return $(container).append(this.caption);
     };
     XYGraphItem.prototype.show = function() {
-      return this.image.show();
+      return this.bubble.show();
     };
     XYGraphItem.prototype.hide = function() {
-      return this.image.hide();
+      return this.bubble.hide();
     };
     XYGraphItem.prototype.moveTo = function(x, y) {
-      return this.image.css({
-        left: x,
-        top: y
+      var self;
+      self = this;
+      this.bubble.css({
+        left: self.getBubbleLeft(x),
+        top: self.getBubbleTop(y)
+      });
+      return this.moveCaptionTo(x, y);
+    };
+    XYGraphItem.prototype.moveCaptionTo = function(x, y) {
+      var self;
+      self = this;
+      return this.caption.css({
+        left: self.getCaptionLeft(x),
+        top: self.getCaptionTop(y)
       });
     };
     XYGraphItem.prototype.animateMoveTo = function(x, y) {
       var self;
-      this._x = x;
-      this._y = y;
       self = this;
-      this.image.stop();
-      return this.image.animate({
-        left: x,
-        top: y
+      this.bubble.stop();
+      return this.bubble.animate({
+        left: self.getBubbleLeft(x),
+        top: self.getBubbleTop(y)
       }, {
         duration: "fast",
-        complete: function() {}
+        complete: __bind(function() {
+          return this.moveCaptionTo(x, y);
+        }, this)
       });
     };
-    XYGraphItem.prototype.moveRandom = function() {
-      var self;
-      self = this;
-      return setTimeout((function() {
-        return self.moveRandomLeft();
-      }), 1000 + Math.random() * 5000);
+    XYGraphItem.prototype.getBubbleLeft = function(x) {
+      return x - (10 + 5);
     };
-    XYGraphItem.prototype.moveRandomLeft = function() {
-      var self;
-      self = this;
-      return this.image.animate({
-        left: this._x - self.image.width() * Math.random(),
-        top: this._y - self.image.height() * Math.random()
-      }, {
-        duration: "slow",
-        complete: function() {
-          return setTimeout((function() {
-            return self.moveRandomRight();
-          }), 1000 + Math.random() * 4000);
-        }
-      });
+    XYGraphItem.prototype.getBubbleTop = function(y) {
+      return y - this.bubble.height();
     };
-    XYGraphItem.prototype.moveRandomRight = function() {
-      var self;
-      self = this;
-      return this.image.animate({
-        left: this._x,
-        top: this._y
-      }, {
-        duration: "slow",
-        complete: function() {
-          return setTimeout((function() {
-            return self.moveRandomLeft();
-          }), 1000 + Math.random() * 4000);
-        }
-      });
+    XYGraphItem.prototype.getCaptionLeft = function(x) {
+      return x - (10 + 5);
     };
-    XYGraphItem.prototype.onMouseover = function() {
-      return this.highlight();
-    };
-    XYGraphItem.prototype.onMouseout = function() {
-      return this.offlight();
-    };
-    XYGraphItem.prototype.onMousedown = function(event) {
-      event.stopPropagation();
-      if (this.detail) {
-        delete this.detail;
-      }
-      return this.detail = new XYGraphDetail(this);
+    XYGraphItem.prototype.getCaptionTop = function(y) {
+      return y;
     };
     return XYGraphItem;
   })();

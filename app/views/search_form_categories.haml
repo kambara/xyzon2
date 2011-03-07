@@ -1,0 +1,6 @@
+%select(name="category")
+  - Kakaku::Category.keys.each_with_index do |category, index|
+    %option{:value => category,
+            :selected => params[:category] == category,
+            :class => (index % 2 == 0) ? 'even' : 'odd' }
+      = Kakaku::Category.ja(category)

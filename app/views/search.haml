@@ -1,0 +1,39 @@
+#header.clearfix
+  %table
+    %tr
+      %td
+        %h1.top-left-logo
+          %a(href='/') XYzon
+      %td
+        = haml :search_form, :layout => false
+
+#x-menu-box
+  %select#x-axis-menu
+    %option(value='LowestPrice') 値段
+    %option(value='PvRanking') 人気ランキング
+    %option(value='SaleDate') 発売日
+    %option(value='NumOfBbs') クチコミ数
+    %option(value='TotalScoreAve') 満足度
+  %br
+  ←
+  %span#x-axis-label
+    安い
+
+#y-menu-box
+  %select#y-axis-menu
+    %option(value='PvRanking') 人気ランキング
+    %option(value='SaleDate') 発売日
+    %option(value='NumOfBbs') クチコミ数
+    %option(value='TotalScoreAve') 満足度
+  %span#y-axis-label
+    売れ筋
+  ↑
+
+%script{:type => 'text/javascript',
+        :src  => '/js/lib/jquery-1.4.2.min.js'}
+%script{:type => 'text/javascript',
+        :src  => '/js/lib/excanvas.compiled.js'}
+%script{:type => 'text/javascript',
+        :src  => '/js/lib/jquery.qtip-1.0.0-rc3.js'}
+%script{:type => 'text/javascript',
+        :src  => '/js/concatenation.js'}

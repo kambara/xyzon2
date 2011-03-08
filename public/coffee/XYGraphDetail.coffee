@@ -6,22 +6,26 @@ class XYGraphDetail
   appendImage: (graphItem) ->
     self = this
     offset = graphItem.image.offset()
-    thumb = graphItem.getLargeImageInfo()
+    thumb = graphItem.thumb
     image = $("<img/>").attr({
-        src: thumb.url
+      src: thumb.url
     }).css({
-        position: "absolute",
-        left: offset.left,
-        top:  offset.top,
-        width:  graphItem.image.width(),
-        height: graphItem.image.height(),
-        padding: graphItem.image.css("padding"),
-        "background-color": graphItem.image.css("background-color"),
-        border: graphItem.image.css("border"),
-        "z-index": 3000
+      position: "absolute"
+      left: offset.left
+      top:  offset.top
+      width:  graphItem.image.width()
+      height: graphItem.image.height()
+      padding: graphItem.image.css('padding')
+      border: graphItem.image.css("border")
+      'border-radius': 4
+      '-moz-border-radius': 4
+      'background-color': graphItem.image.css('background-color')
+      'z-index': 6000
+      'box-shadow': '3px 3px 10px rgba(0, 0, 0, 0.3)'
+      '-moz-box-shadow': '3px 3px 10px rgba(0, 0, 0, 0.3)'
     }).mousemove((event) ->
-        event.preventDefault()
-    ).appendTo("body")
+      event.preventDefault()
+    ).appendTo('body')
 
     # animate
     medium = graphItem.getFullscaleImageInfo()
@@ -35,7 +39,7 @@ class XYGraphDetail
     right = left + medium.width
     bottom = top + medium.height
     rightMargin = viewportSize.width - (left + medium.width)
-    tipWidth = 400 + 50
+    tipWidth = 300 + 50
 
     if (left < tipWidth && rightMargin < tipWidth)
         # 左右両端に吹き出し用スペースがない
@@ -57,8 +61,6 @@ class XYGraphDetail
         top = viewportSize.height - medium.height
 
     image.animate({
-        #left: offset.left - (medium.width - graphItem.image.width())/2,
-        #top: offset.top - (medium.height - graphItem.image.height())/2,
         left: left,
         top: top,
         width:  medium.width,
@@ -72,28 +74,16 @@ class XYGraphDetail
     return image
 
   isTipRight: () ->
-    (@image.offset().left < 430)
+    (@image.offset().left < 330)
 
   appendTip: (graphItem) -> # Detail Tip
     self = this
-    reviewHtml = $.map(
-        graphItem.getReviewComments(),
-        (comment)->
-            return (['<div style="border-bottom: 1px solid #333 padding:0.5em">',
-                     "<b>",
-                     comment["summary"],
-                     "</b>",
-                     "<br/>",
-                     comment["content"],
-                     "</div>"
-                    ]).join("")
-    ).join("")
     summaryHtml = ([
         graphItem.getLowestPrice() + "円"
-        "満足度 " +
-          graphItem.getTotalScoreAve()
-        "人気ランキング：" + graphItem.getPvRanking() + "位"
-        "発売日：" + (graphItem.getSaleDateString() || "?")
+        "満足度：" + (graphItem.getTotalScoreAve() || '?')
+        "売れ筋ランキング：" + graphItem.getPvRanking() + "位"
+        "発売日：" + (graphItem.getSaleDateString() || '?')
+        graphItem.getComment()
     ]).join("<br />")
 
     isRight = @isTipRight()
@@ -115,7 +105,7 @@ class XYGraphDetail
                 radius: 3
             },
             width: {
-                max: 400
+                max: 300
             },
             title: {
                 "font-size": "110%"

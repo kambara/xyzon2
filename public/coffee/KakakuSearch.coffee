@@ -1,7 +1,17 @@
 class KakakuSearch
-  constructor: (@xyGraph) ->
+  @COMPLETE: 'complete'
+  @ITEM_ELEMENT: 'item_element'
+
+  constructor: ->
+    @dispatcher_ = $(this)
     @maxPages = 0
     @fetchFirstPage()
+
+  bind: (evt, func) ->
+    @dispatcher_.bind(evt, func)
+
+  trigger: (evt, args=[]) ->
+    @dispatcher_.trigger(evt, args)
 
   fetchFirstPage: ->
     $.get(@makeSearchURL(1), (xml) =>
@@ -21,6 +31,8 @@ class KakakuSearch
       @loadedCount += 1
       if @loadedCount >= @maxPages
         $.log "Loaded"
+        ## TODO: Areaに通知。おすすめカテゴリを更新する。（dispatchしたい）
+        @trigger(KakakuSearch.COMPLETE)
     )
 
   isError: (xml) ->
@@ -28,24 +40,23 @@ class KakakuSearch
     error = xml.find("Error")
     if (error.length > 0)
       error.find("Message").each (i, elem) ->
-        $.log("Page "+ page + ": " + $(elem).text())
+        $.log($(elem).text())
       true
     else
       false
 
   parseXML: (xml, page) ->
     xml = $(xml)
+    $.log 'Parse page ' + page
     return if @isError(xml)
     if page is 1
       numOfResult = parseInt(xml.find("NumOfResult").text())
       allPageNum = Math.ceil(numOfResult/20)
       max = 3
       @maxPages = if (allPageNum <= max) then allPageNum else max
-
-    $.log 'Parse page ' + page
     ## Itemをグラフに追加
     xml.find("Item").each (index, elem) =>
-      @xyGraph.appendItem elem
+      @trigger(KakakuSearch.ITEM_ELEMENT, [elem])
 
   makeSearchURL: (page) ->
     params = @getLocationParams()

@@ -1,21 +1,21 @@
 body {
-    font-family: 'Trebuchet MS', sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #FFBF00;
-    overflow: hidden;
+  font-family: 'Trebuchet MS', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #FFBF00;
+  overflow: hidden;
 }
 
 /*
  * Logo
  */
 h1.top-left-logo {
-    margin: 0 0.6em 0 0.6em;
-    font-size: 200%;
+  margin: 0 0.6em 0 0.6em;
+  font-size: 200%;
 }
 
 h1.index {
-    font-size: 300%;
+  font-size: 300%;
 }
 
 h1 a {

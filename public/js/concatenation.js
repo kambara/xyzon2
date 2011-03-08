@@ -1,5 +1,5 @@
 (function() {
-  var Axis, AxisScale, AxisType, ImageInfo, KakakuSearch, LogAxisScale, Point, Range, Rect, ScaleMode, Selector, XYGraphArea, XYGraphDetail, XYGraphItem, initAxisMenu, initCategorySelection;
+  var Axis, AxisScale, AxisType, Category, CategoryList, ImageInfo, KakakuSearch, LogAxisScale, Point, Range, Rect, ScaleMode, Selector, Util, XYGraphArea, XYGraphDetail, XYGraphItem, initAxisMenu, initCategorySelection;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; }, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -13,7 +13,12 @@
     PvRanking: 'PvRanking',
     TotalScoreAve: 'TotalScoreAve',
     LowestPrice: 'LowestPrice',
-    NumOfBbs: 'NumOfBbs'
+    NumOfBbs: 'NumOfBbs',
+    MonitorSize: 'MonitorSize',
+    HDDSize: 'HDDSize',
+    MemorySize: 'MemorySize',
+    Noise: 'Noise',
+    Weight: 'Weight'
   };
   Axis = (function() {
     function Axis(axisType) {
@@ -31,6 +36,16 @@
           return '円';
         case AxisType.NumOfBbs:
           return '件';
+        case AxisType.MonitorSize:
+          return 'インチ';
+        case AxisType.HDDSize:
+          return 'GB';
+        case AxisType.MemorySize:
+          return 'GB';
+        case AxisType.Noise:
+          return 'db';
+        case AxisType.Weight:
+          return 'g';
         default:
           return '';
       }
@@ -38,7 +53,7 @@
     Axis.prototype.getLabel = function() {
       switch (this.axisType) {
         case AxisType.SaleDate:
-          return '古い';
+          return '新しい';
         case AxisType.PvRanking:
           return '高い';
         case AxisType.TotalScoreAve:
@@ -47,6 +62,16 @@
           return '安い';
         case AxisType.NumOfBbs:
           return '少ない';
+        case AxisType.MonitorSize:
+          return '小さい';
+        case AxisType.HDDSize:
+          return '少ない';
+        case AxisType.MemorySize:
+          return '少ない';
+        case AxisType.Noise:
+          return '静か';
+        case AxisType.Weight:
+          return '軽い';
         default:
           return '';
       }
@@ -54,13 +79,22 @@
     Axis.prototype.isLogScale = function() {
       return this.axisType.toString() === AxisType.PvRanking;
     };
-    Axis.prototype.getScale = function(scaleMode) {
+    Axis.prototype.createScale = function(scaleMode, paddingHead, paddingFoot, desc) {
       var thick;
-      thick = scaleMode === ScaleMode.HORIZONTAL ? 34 : 100;
+      if (paddingHead == null) {
+        paddingHead = 0;
+      }
+      if (paddingFoot == null) {
+        paddingFoot = 0;
+      }
+      if (desc == null) {
+        desc = false;
+      }
+      thick = scaleMode === ScaleMode.HORIZONTAL ? 50 : 100;
       if (this.isLogScale()) {
-        return new LogAxisScale(thick, scaleMode, this.getUnit());
+        return new LogAxisScale(thick, scaleMode, this.getUnit(), paddingHead, paddingFoot);
       } else {
-        return new AxisScale(thick, scaleMode, this.getUnit());
+        return new AxisScale(thick, scaleMode, this.getUnit(), paddingHead, paddingFoot);
       }
     };
     return Axis;
@@ -70,7 +104,9 @@
     VERTICAL: 2
   };
   AxisScale = (function() {
-    function AxisScale(thick, scaleMode, unit) {
+    function AxisScale(thick, scaleMode, unit, paddingHead, paddingFoot) {
+      this.paddingHead = paddingHead != null ? paddingHead : 0;
+      this.paddingFoot = paddingFoot != null ? paddingFoot : 0;
       this.markColor = "#333";
       this.thickness = thick;
       this.length = 1;
@@ -81,20 +117,15 @@
         position: 'absolute',
         'z-index': 100,
         'background-color': '#FF7F00'
-      });
-      $(document.body).append(this.innerContainer);
-      this.canvas = $('<canvas/>').css({
-        width: 10,
-        height: 10
-      }).get(0);
+      }).appendTo(document.body);
+      this.canvas = $('<canvas/>').width(10).height(10);
       this.innerContainer.append(this.canvas);
-      this.ctx = this.getContext(this.canvas);
+      this.ctx = this.getContext(this.canvas.get(0));
     }
     AxisScale.prototype.remove = function() {
       if (this.innerContainer) {
-        $(this.canvas).remove();
-        $(this.ctx).remove();
-        return $(this.innerContainer).remove();
+        this.canvas.remove();
+        return this.innerContainer.remove();
       }
     };
     AxisScale.prototype.getWidth = function() {
@@ -113,8 +144,8 @@
     };
     AxisScale.prototype.setLength = function(value) {
       this.length = value;
-      $(this.innerContainer).width(this.getWidth()).height(this.getHeight());
-      $(this.canvas).attr({
+      this.innerContainer.width(this.getWidth()).height(this.getHeight());
+      this.canvas.width(this.getWidth()).height(this.getHeight()).attr({
         width: this.getWidth(),
         height: this.getHeight()
       });
@@ -139,6 +170,9 @@
     AxisScale.prototype.getScaleLength = function() {
       return this.hv(this.getWidth(), this.getHeight());
     };
+    AxisScale.prototype.getScaleBodyLength = function() {
+      return this.getScaleLength() - this.paddingHead - this.paddingFoot;
+    };
     AxisScale.prototype.getContext = function(canvasElem) {
       if (typeof G_vmlCanvasManager !== 'undefined') {
         canvasElem = G_vmlCanvasManager.initElement(canvasElem);
@@ -157,7 +191,9 @@
         'font-size': 13,
         color: '#333',
         left: this.hv(pos, offset),
-        top: this.hv(offset, pos)
+        top: this.hv(offset, pos),
+        '-webkit-transform': 'rotate(20deg)',
+        '-moz-transform': 'rotate(20deg)'
       }).text(text + this.unit).appendTo(this.innerContainer);
     };
     AxisScale.prototype.removeAllTexts = function() {
@@ -168,7 +204,7 @@
       return this.update_();
     };
     AxisScale.prototype.update_ = function() {
-      var labeledNumberTable, num100000Marks, num10000Marks, num1000Marks, num100Marks;
+      var labeledNumberTable, num100000Marks, num10000Marks, num1000Marks, num100Marks, num10Marks;
       if (!this.range) {
         return;
       }
@@ -183,7 +219,10 @@
           if (num1000Marks <= 4) {
             num100Marks = this.drawMarks(this.range, 100, 1, 8, num1000Marks <= 1, labeledNumberTable);
             if (num100Marks <= 4) {
-              return this.drawMarks(this.range, 10, 1, 8, num100Marks <= 1, labeledNumberTable);
+              num10Marks = this.drawMarks(this.range, 10, 1, 8, num100Marks <= 1, labeledNumberTable);
+              if (num10Marks <= 4) {
+                return this.drawMarks(this.range, 1, 1, 8, num10Marks <= 1, labeledNumberTable);
+              }
             }
           }
         }
@@ -194,8 +233,8 @@
       if (range.getDifference() < 1) {
         return 0;
       }
-      interval = unit * this.getScaleLength() / range.getDifference();
-      rightScaleValue = Math.floor(range.last / unit) * unit;
+      interval = unit * this.getScaleBodyLength() / range.getDifference();
+      rightScaleValue = Math.ceil(range.last / unit) * unit;
       rightOffset = interval * (range.last - rightScaleValue) / unit;
       count = 0;
       while (true) {
@@ -203,7 +242,7 @@
           $.log('Too many!');
           break;
         }
-        pos = this.getScaleLength() - rightOffset - interval * count;
+        pos = this.paddingHead + this.getScaleBodyLength() - rightOffset - interval * count;
         if (pos < 0) {
           break;
         }
@@ -211,7 +250,7 @@
         if (interval > 40) {
           value = rightScaleValue - unit * count;
           if (!labeledNumberTable[value]) {
-            this.appendText(value.toString(), pos - 3, lineLength);
+            this.appendText(value.toString(), pos, lineLength);
             labeledNumberTable[value] = true;
           }
         }
@@ -227,14 +266,113 @@
       }
     };
     AxisScale.prototype.drawLine = function(x1, y1, x2, y2, lineWidth, lineLength) {
-      this.ctx.strokeStyle = "#333";
-      this.ctx.lineWidth = lineWidth;
-      this.ctx.beginPath();
-      this.ctx.moveTo(x1, y1);
-      this.ctx.lineTo(x2, y2);
-      return this.ctx.stroke();
+      try {
+        this.ctx.strokeStyle = "#333";
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        this.ctx.lineTo(x2, y2);
+        return this.ctx.stroke();
+      } catch (error) {
+
+      }
     };
     return AxisScale;
+  })();
+  Category = (function() {
+    function Category() {}
+    Category.nameToKey = {
+      'パソコン': 'Pc',
+      '家電': 'Kaden',
+      'カメラ': 'Camera',
+      'ゲーム': 'Game',
+      '自動車・バイク': 'Kuruma',
+      'スポーツ・アウトドア': 'Sports',
+      'ベビー・キッズ': 'Baby',
+      'ペット': 'Pet',
+      'ビューティー・ヘルス': 'Beauty_Health'
+    };
+    Category.keyToName = {
+      'Pc': 'パソコン',
+      'Kaden': '家電',
+      'Camera': 'カメラ',
+      'Game': 'ゲーム',
+      'Kuruma': '自動車・バイク',
+      'Sports': 'スポーツ・アウトドア',
+      'Baby': 'ベビー・キッズ',
+      'Pet': 'ペット',
+      'Beauty_Health': 'ビューティー・ヘルス'
+    };
+    Category.getKeyFrom = function(ja) {
+      return Category.nameToKey[ja];
+    };
+    Category.getNameFrom = function(key) {
+      return Category.keyToName[key];
+    };
+    return Category;
+  })();
+  CategoryList = (function() {
+    function CategoryList() {
+      this.categories_ = [];
+    }
+    CategoryList.prototype.add = function(categoryName) {
+      return this.categories_.push(categoryName.split('>'));
+    };
+    CategoryList.prototype.recommend = function() {
+      var buf, cat, name, _i, _len, _ref;
+      buf = {};
+      _ref = this.categories_;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        cat = _ref[_i];
+        name = cat[0];
+        buf[name] = buf[name] ? buf[name] + 1 : 1;
+      }
+      return this.sortObj(buf);
+    };
+    CategoryList.prototype.recommendSub = function(categoryKey) {
+      var buf, cat, categoryName, name, top, _i, _len, _ref;
+      categoryName = Category.getNameFrom(categoryKey);
+      buf = {};
+      _ref = this.categories_;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        cat = _ref[_i];
+        top = cat[0];
+        name = cat[cat.length - 1];
+        if (top === categoryName) {
+          buf[name] = buf[name] ? buf[name] + 1 : 1;
+        }
+      }
+      return this.sortObj(buf);
+    };
+    CategoryList.prototype.sortObj = function(obj) {
+      var ary, item, name, num, _i, _j, _len, _len2, _results;
+      ary = (function() {
+        var _results;
+        _results = [];
+        for (name in obj) {
+          num = obj[name];
+          _results.push({
+            name: name,
+            num: num
+          });
+        }
+        return _results;
+      })();
+      ary = ary.sort(function(a, b) {
+        return b.num - a.num;
+      });
+      for (_i = 0, _len = ary.length; _i < _len; _i++) {
+        item = ary[_i];
+        $.log(item.name + " " + item.num);
+      }
+      _results = [];
+      for (_j = 0, _len2 = ary.length; _j < _len2; _j++) {
+        item = ary[_j];
+        _results.push(item.name);
+      }
+      return _results;
+    };
+    return CategoryList;
   })();
   ImageInfo = (function() {
     function ImageInfo(url, width, height) {
@@ -266,7 +404,7 @@
       if (url) {
         url = url.replace(/\/m\//, '/fullscale/');
       }
-      return new ImageInfo(url, 626, 470);
+      return new ImageInfo(url, 626 / 2, 470 / 2);
     };
     ImageInfo.getUrlFrom = function(item) {
       return item.find("ImageUrl").text();
@@ -274,11 +412,22 @@
     return ImageInfo;
   })();
   KakakuSearch = (function() {
-    function KakakuSearch(xyGraph) {
-      this.xyGraph = xyGraph;
+    KakakuSearch.COMPLETE = 'complete';
+    KakakuSearch.ITEM_ELEMENT = 'item_element';
+    function KakakuSearch() {
+      this.dispatcher_ = $(this);
       this.maxPages = 0;
       this.fetchFirstPage();
     }
+    KakakuSearch.prototype.bind = function(evt, func) {
+      return this.dispatcher_.bind(evt, func);
+    };
+    KakakuSearch.prototype.trigger = function(evt, args) {
+      if (args == null) {
+        args = [];
+      }
+      return this.dispatcher_.trigger(evt, args);
+    };
     KakakuSearch.prototype.fetchFirstPage = function() {
       return $.get(this.makeSearchURL(1), __bind(function(xml) {
         this.parseXML(xml, 1);
@@ -301,7 +450,8 @@
         this.parseXML(xml, page);
         this.loadedCount += 1;
         if (this.loadedCount >= this.maxPages) {
-          return $.log("Loaded");
+          $.log("Loaded");
+          return this.trigger(KakakuSearch.COMPLETE);
         }
       }, this));
     };
@@ -311,7 +461,7 @@
       error = xml.find("Error");
       if (error.length > 0) {
         error.find("Message").each(function(i, elem) {
-          return $.log("Page " + page + ": " + $(elem).text());
+          return $.log($(elem).text());
         });
         return true;
       } else {
@@ -321,6 +471,7 @@
     KakakuSearch.prototype.parseXML = function(xml, page) {
       var allPageNum, max, numOfResult;
       xml = $(xml);
+      $.log('Parse page ' + page);
       if (this.isError(xml)) {
         return;
       }
@@ -330,9 +481,8 @@
         max = 3;
         this.maxPages = allPageNum <= max ? allPageNum : max;
       }
-      $.log('Parse page ' + page);
       return xml.find("Item").each(__bind(function(index, elem) {
-        return this.xyGraph.appendItem(elem);
+        return this.trigger(KakakuSearch.ITEM_ELEMENT, [elem]);
       }, this));
     };
     KakakuSearch.prototype.makeSearchURL = function(page) {
@@ -359,11 +509,13 @@
   })();
   LogAxisScale = (function() {
     __extends(LogAxisScale, AxisScale);
-    function LogAxisScale(thick, scaleMode, unit) {
-      LogAxisScale.__super__.constructor.call(this, thick, scaleMode, unit);
+    function LogAxisScale(thick, scaleMode, unit, paddingHead, paddingFoot) {
+      this.paddingHead = paddingHead != null ? paddingHead : 0;
+      this.paddingFoot = paddingFoot != null ? paddingFoot : 0;
+      LogAxisScale.__super__.constructor.call(this, thick, scaleMode, unit, this.paddingHead, this.paddingFoot);
     }
     LogAxisScale.prototype.getLogPos = function(value, range) {
-      return (Math.log(value) - range.getLogFirst()) * this.getScaleLength() / range.getLogDifference();
+      return this.paddingHead + (Math.log(value) - range.getLogFirst()) * this.getScaleBodyLength() / range.getLogDifference();
     };
     LogAxisScale.prototype.update_ = function() {
       var i, j, pos, pos2, prevPos, value, value2, _results;
@@ -549,22 +701,62 @@
     };
     return Selector;
   })();
+  Util = (function() {
+    function Util() {}
+    Util.getLocationParams = function() {
+      var i, pair, pairs, params, _ref;
+      if (location.search.length <= 1) {
+        return {};
+      }
+      pairs = location.search.substr(1).split("&");
+      params = {};
+      for (i = 0, _ref = pairs.length; (0 <= _ref ? i < _ref : i > _ref); (0 <= _ref ? i += 1 : i -= 1)) {
+        pair = pairs[i].split("=");
+        if (pair.length === 2) {
+          params[pair[0]] = pair[1];
+        }
+      }
+      return params;
+    };
+    return Util;
+  })();
   XYGraphArea = (function() {
     function XYGraphArea() {
+      var kakakuSearch, params;
+      params = Util.getLocationParams();
+      this.subCategoryName = params['sub'] ? decodeURIComponent(params['sub']) : null;
+      if (this.subCategoryName) {
+        $('#sub-category').text(this.subCategoryName);
+      }
+      this.categoryList = new CategoryList();
       this.graphItems = [];
-      this.xAxis = new Axis(AxisType.LowestPrice);
-      this.yAxis = new Axis(AxisType.PvRanking);
-      this.reset_();
-      this.itemContainer = this.createItemContainer();
-      $(document.body).append(this.itemContainer);
+      this.paddingTop = 70;
+      this.paddingBottom = 10;
+      this.paddingLeft = 30;
+      this.paddingRight = 200;
+      if ($(window).width() > 1600) {
+        this.paddingTop += 80;
+        this.paddingRight += 80;
+      }
+      this.itemContainer = this.createItemContainer().appendTo(document.body);
       this.selector = new Selector();
       this.selector.hide();
+      this.xAxis = new Axis(AxisType.LowestPrice);
+      this.yAxis = new Axis(AxisType.PvRanking);
+      this.onAxisReset();
+      this.onWindowResize();
       $(window).resize(__bind(function() {
         return this.onWindowResize();
       }, this));
-      this.onWindowResize();
+      kakakuSearch = new KakakuSearch();
+      kakakuSearch.bind(KakakuSearch.ITEM_ELEMENT, (__bind(function(evt, elem) {
+        return this.appendItem(elem);
+      }, this)));
+      kakakuSearch.bind(KakakuSearch.COMPLETE, (__bind(function() {
+        return this.updateRecommendCategory();
+      }, this)));
     }
-    XYGraphArea.prototype.reset_ = function() {
+    XYGraphArea.prototype.onAxisReset = function() {
       var graphItem, _i, _len, _ref, _results;
       this.minXValue_ = null;
       this.maxXValue_ = null;
@@ -583,8 +775,8 @@
       if (this.yAxisScale) {
         this.yAxisScale.remove();
       }
-      this.xAxisScale = this.xAxis.getScale(ScaleMode.HORIZONTAL);
-      this.yAxisScale = this.yAxis.getScale(ScaleMode.VERTICAL);
+      this.xAxisScale = this.xAxis.createScale(ScaleMode.HORIZONTAL, this.paddingLeft, this.paddingRight);
+      this.yAxisScale = this.yAxis.createScale(ScaleMode.VERTICAL, this.paddingTop, this.paddingBottom);
       _ref = this.graphItems;
       _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
@@ -596,19 +788,20 @@
     XYGraphArea.prototype.switchXAxis = function(axisType) {
       delete this.xAxis;
       this.xAxis = new Axis(axisType);
-      this.reset_();
+      this.onAxisReset();
       return this.onWindowResize();
     };
     XYGraphArea.prototype.switchYAxis = function(axisType) {
       delete this.yAxis;
       this.yAxis = new Axis(axisType);
-      this.reset_();
+      this.onAxisReset();
       return this.onWindowResize();
     };
     XYGraphArea.prototype.onWindowResize = function() {
       var offset, rect, yMenuBox;
+      $('body').height($(window).height());
       this.width = $(window).width() - $('#x-menu-box').outerWidth() - 100;
-      this.height = $(window).height() - $('#header').outerHeight() - 34;
+      this.height = $(window).height() - $('#header').outerHeight() - 50;
       this.itemContainer.width(this.width).height(this.height).css({
         left: $('#x-menu-box').outerWidth(),
         top: $('#header').outerHeight()
@@ -625,7 +818,7 @@
       this.yAxisScale.setPosition(rect.left + rect.width, rect.top);
       this.xAxisScale.setLength(rect.width);
       this.yAxisScale.setLength(rect.height);
-      this.selector.setLimitRect(rect.left, rect.top, rect.width, rect.height);
+      this.selector.setLimitRect(offset.left, offset.top, this.itemContainer.innerWidth(), this.itemContainer.innerHeight());
       yMenuBox = $('#y-menu-box');
       return yMenuBox.css({
         left: $(window).width() - yMenuBox.outerWidth(),
@@ -636,11 +829,10 @@
       var div;
       div = $("<div/>").unselectable().css({
         border: "1px solid #555",
-        "background-color": "#FFF",
+        'background-color': "#FFF",
         position: 'absolute',
         cursor: "crosshair",
-        overflow: "hidden",
-        "float": "left"
+        overflow: "hidden"
       }).mousedown(__bind(function(event) {
         return this.onMousedown(event);
       }, this));
@@ -654,7 +846,6 @@
       return div;
     };
     XYGraphArea.prototype.onMousedown = function(event) {
-      var item, _i, _len, _ref, _results;
       event.preventDefault();
       event.stopPropagation();
       if (this.dragging) {
@@ -666,14 +857,7 @@
       }
       this.dragging = true;
       this.selector.start(event.pageX, event.pageY);
-      this.selector.show();
-      _ref = this.graphItems;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        item = _ref[_i];
-        _results.push(item.inactivateTip());
-      }
-      return _results;
+      return this.selector.show();
     };
     XYGraphArea.prototype.isAnyDetailShowing = function() {
       return $.any(this.graphItems, function(i, item) {
@@ -698,7 +882,7 @@
       return this.selector.resizeTo(event.pageX, event.pageY);
     };
     XYGraphArea.prototype.onMouseup = function(event) {
-      var item, rect, _i, _len, _ref, _results;
+      var rect;
       if (!this.dragging) {
         return;
       }
@@ -707,17 +891,10 @@
       rect = this.selector.getRelativeRect();
       this.selector.hide();
       if (rect.width < 3 && rect.height < 3) {
-        this.zoomOut();
+        return this.zoomOut();
       } else {
-        this.zoomIn(new Range(this.calcXValue(rect.getLeft()), this.calcXValue(rect.getRight())), new Range(this.calcYValue(rect.getTop()), this.calcYValue(rect.getBottom())));
+        return this.zoomIn(new Range(this.calcXValue(rect.getLeft()), this.calcXValue(rect.getRight())), new Range(this.calcYValue(rect.getTop()), this.calcYValue(rect.getBottom())));
       }
-      _ref = this.graphItems;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        item = _ref[_i];
-        _results.push(item.activateTip());
-      }
-      return _results;
     };
     XYGraphArea.prototype.setLocationHash = function(xRange, yRange) {
       var params, url;
@@ -755,13 +932,14 @@
       }
     };
     XYGraphArea.prototype.adjustGraphItems = function() {
-      var item, self, _i, _len, _ref, _results;
-      self = this;
+      var item, xValue, yValue, _i, _len, _ref, _results;
       _ref = this.graphItems;
       _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         item = _ref[_i];
-        _results.push(item.animateMoveTo(this.calcXCoord(item.getAxisValue(this.xAxis.axisType)), this.calcYCoord(item.getAxisValue(this.yAxis.axisType))));
+        xValue = item.getAxisValue(this.xAxis.axisType);
+        yValue = item.getAxisValue(this.yAxis.axisType);
+        _results.push((xValue != null) && !isNaN(xValue) && (yValue != null) && !isNaN(yValue) ? (item.animateMoveTo(this.calcXCoord(xValue), this.calcYCoord(yValue)), item.show()) : item.hide());
       }
       return _results;
     };
@@ -780,24 +958,28 @@
       }
     };
     XYGraphArea.prototype.calcXCoord = function(value) {
-      if (this.xAxis.isLogScale()) {
-        return Math.round(this.width * (Math.log(value) - this.xCurrentAxisRange.getLogFirst()) / this.xCurrentAxisRange.getLogDifference());
-      } else {
-        return Math.round(this.width * (value - this.xCurrentAxisRange.first) / this.xCurrentAxisRange.getDifference());
-      }
+      return this.paddingLeft + Math.round(this.xAxis.isLogScale() ? this.getBodyWidth() * (Math.log(value) - this.xCurrentAxisRange.getLogFirst()) / this.xCurrentAxisRange.getLogDifference() : this.getBodyWidth() * (value - this.xCurrentAxisRange.first) / this.xCurrentAxisRange.getDifference());
     };
     XYGraphArea.prototype.calcYCoord = function(value) {
-      if (this.yAxis.isLogScale()) {
-        return Math.round(this.height * (Math.log(value) - this.yCurrentAxisRange.getLogFirst()) / this.yCurrentAxisRange.getLogDifference());
-      } else {
-        return Math.round(this.height * (value - this.yCurrentAxisRange.first) / this.yCurrentAxisRange.getDifference());
-      }
+      return this.paddingTop + Math.round(this.yAxis.isLogScale() ? this.getBodyHeight() * (Math.log(value) - this.yCurrentAxisRange.getLogFirst()) / this.yCurrentAxisRange.getLogDifference() : this.getBodyHeight() * (value - this.yCurrentAxisRange.first) / this.yCurrentAxisRange.getDifference());
+    };
+    XYGraphArea.prototype.getBodyWidth = function() {
+      return this.width - this.paddingLeft - this.paddingRight;
+    };
+    XYGraphArea.prototype.getBodyHeight = function() {
+      return this.height - this.paddingTop - this.paddingBottom;
     };
     XYGraphArea.prototype.appendItem = function(itemXmlElem) {
       var graphItem;
       graphItem = new XYGraphItem(itemXmlElem);
       if (!graphItem.getLowestPrice()) {
         return;
+      }
+      this.categoryList.add(graphItem.getCategoryName());
+      if (this.subCategoryName) {
+        if (this.subCategoryName !== graphItem.getSubCategoryName()) {
+          return;
+        }
       }
       this.graphItems.push(graphItem);
       graphItem.render(this.itemContainer);
@@ -841,22 +1023,11 @@
       }
     };
     XYGraphArea.prototype.setMaxAxisRange = function(xRange, yRange) {
-      var paddingBottom, paddingRight;
-      paddingRight = 100;
-      paddingBottom = 120;
-      this.xMaxAxisRange = this.extendRange(xRange, paddingRight, this.width, this.xAxis.isLogScale());
-      this.yMaxAxisRange = this.extendRange(yRange, paddingBottom, this.height, this.yAxis.isLogScale());
+      this.xMaxAxisRange = xRange;
+      this.yMaxAxisRange = yRange;
       if (this.rangeHistories.length === 0) {
         return this.setCurrentAxisRange(xRange, yRange);
       }
-    };
-    XYGraphArea.prototype.extendRange = function(range, lastPaddingPixel, lengthPixel, isLog) {
-      if (isLog) {
-        range.last = Math.exp(range.getLogLast() + (lastPaddingPixel * range.getLogDifference() / lengthPixel));
-      } else {
-        range.last = range.last + (lastPaddingPixel * range.getDifference() / lengthPixel);
-      }
-      return range;
     };
     XYGraphArea.prototype.setCurrentAxisRange = function(xRange, yRange) {
       this.xCurrentAxisRange = xRange;
@@ -864,6 +1035,53 @@
       this.xAxisScale.setRange(xRange);
       this.yAxisScale.setRange(yRange);
       return this.adjustGraphItems();
+    };
+    XYGraphArea.prototype.updateRecommendCategory = function() {
+      var categoryKey, names, params;
+      params = Util.getLocationParams();
+      categoryKey = params['category'];
+      if (categoryKey && categoryKey !== 'ALL') {
+        names = this.categoryList.recommendSub(categoryKey).slice(0, 3);
+        return this.appendRecommendSubCategories(categoryKey, names);
+      } else {
+        names = this.categoryList.recommend().slice(0, 3);
+        return this.appendRecommendCategories(names);
+      }
+    };
+    XYGraphArea.prototype.appendRecommendCategories = function(names) {
+      var container, key, keyword, link, name, params, _i, _len, _results;
+      container = $('#sub-category');
+      params = Util.getLocationParams();
+      keyword = params['keyword'];
+      _results = [];
+      for (_i = 0, _len = names.length; _i < _len; _i++) {
+        name = names[_i];
+        key = Category.getKeyFrom(name);
+        link = $('<a/>').attr({
+          href: "/search?keyword=" + keyword + "&category=" + key
+        }).addClass('recommend').text(name);
+        _results.push(container.append(link));
+      }
+      return _results;
+    };
+    XYGraphArea.prototype.appendRecommendSubCategories = function(categoryKey, names) {
+      var container, keyword, link, name, params, sub, _i, _len, _results;
+      container = $('#sub-category');
+      params = Util.getLocationParams();
+      keyword = params['keyword'];
+      _results = [];
+      for (_i = 0, _len = names.length; _i < _len; _i++) {
+        name = names[_i];
+        if (this.subCategoryName && (name === this.subCategoryName)) {
+          continue;
+        }
+        sub = encodeURIComponent(name);
+        link = $('<a/>').attr({
+          href: "/search?keyword=" + keyword + "&category=" + categoryKey + "&sub=" + sub
+        }).addClass('recommend').text(name);
+        _results.push(container.append(link));
+      }
+      return _results;
     };
     return XYGraphArea;
   })();
@@ -877,7 +1095,7 @@
       var bottom, image, left, medium, offset, right, rightMargin, self, thumb, tipWidth, top, viewportSize;
       self = this;
       offset = graphItem.image.offset();
-      thumb = graphItem.getLargeImageInfo();
+      thumb = graphItem.thumb;
       image = $("<img/>").attr({
         src: thumb.url
       }).css({
@@ -886,13 +1104,17 @@
         top: offset.top,
         width: graphItem.image.width(),
         height: graphItem.image.height(),
-        padding: graphItem.image.css("padding"),
-        "background-color": graphItem.image.css("background-color"),
+        padding: graphItem.image.css('padding'),
         border: graphItem.image.css("border"),
-        "z-index": 3000
+        'border-radius': 4,
+        '-moz-border-radius': 4,
+        'background-color': graphItem.image.css('background-color'),
+        'z-index': 6000,
+        'box-shadow': '3px 3px 10px rgba(0, 0, 0, 0.3)',
+        '-moz-box-shadow': '3px 3px 10px rgba(0, 0, 0, 0.3)'
       }).mousemove(function(event) {
         return event.preventDefault();
-      }).appendTo("body");
+      }).appendTo('body');
       medium = graphItem.getFullscaleImageInfo();
       viewportSize = {
         width: $(window).width(),
@@ -903,7 +1125,7 @@
       right = left + medium.width;
       bottom = top + medium.height;
       rightMargin = viewportSize.width - (left + medium.width);
-      tipWidth = 400 + 50;
+      tipWidth = 300 + 50;
       if (left < tipWidth && rightMargin < tipWidth) {
         if (left < rightMargin) {
           left = viewportSize.width - tipWidth - medium.width;
@@ -935,15 +1157,12 @@
       return image;
     };
     XYGraphDetail.prototype.isTipRight = function() {
-      return this.image.offset().left < 430;
+      return this.image.offset().left < 330;
     };
     XYGraphDetail.prototype.appendTip = function(graphItem) {
-      var isRight, reviewHtml, self, summaryHtml, tip;
+      var isRight, self, summaryHtml, tip;
       self = this;
-      reviewHtml = $.map(graphItem.getReviewComments(), function(comment) {
-        return ['<div style="border-bottom: 1px solid #333 padding:0.5em">', "<b>", comment["summary"], "</b>", "<br/>", comment["content"], "</div>"].join("");
-      }).join("");
-      summaryHtml = [graphItem.getLowestPrice() + "円", "満足度 " + graphItem.getTotalScoreAve(), "人気ランキング：" + graphItem.getPvRanking() + "位", "発売日：" + (graphItem.getSaleDateString() || "?")].join("<br />");
+      summaryHtml = [graphItem.getLowestPrice() + "円", "満足度：" + (graphItem.getTotalScoreAve() || '?'), "売れ筋ランキング：" + graphItem.getPvRanking() + "位", "発売日：" + (graphItem.getSaleDateString() || '?'), graphItem.getComment()].join("<br />");
       isRight = this.isTipRight();
       tip = this.image.qtip({
         content: {
@@ -959,7 +1178,7 @@
             radius: 3
           },
           width: {
-            max: 400
+            max: 300
           },
           title: {
             "font-size": "110%"
@@ -1054,7 +1273,7 @@
     XYGraphItem.prototype.getAxisValue = function(axisType) {
       switch (axisType) {
         case AxisType.SaleDate:
-          return this.getSaleDateTime();
+          return this.getSaleDateTimeAgo();
         case AxisType.PvRanking:
           return this.getPvRanking();
         case AxisType.TotalScoreAve:
@@ -1063,6 +1282,16 @@
           return this.getLowestPrice();
         case AxisType.NumOfBbs:
           return this.getNumOfBbs();
+        case AxisType.MonitorSize:
+          return this.getMonitorSize();
+        case AxisType.HDDSize:
+          return this.getHDDSize();
+        case AxisType.MemorySize:
+          return this.getMemorySize();
+        case AxisType.Noise:
+          return this.getNoise();
+        case AxisType.Weight:
+          return this.getWeight();
         default:
           return $.log("No such AxisType: " + axisType);
       }
@@ -1097,29 +1326,85 @@
         return null;
       }
     };
+    XYGraphItem.prototype.getSaleDateTimeAgo = function() {
+      var dateTime;
+      dateTime = this.getSaleDateTime();
+      if (dateTime) {
+        return (new Date()).getTime() - dateTime;
+      } else {
+        return null;
+      }
+    };
     XYGraphItem.prototype.getComment = function() {
       return this.item.find('Comment').eq(0).text();
+    };
+    XYGraphItem.prototype.getMonitorSize = function() {
+      var m;
+      m = this.getComment().match(/(画面|液晶|モニタ)サイズ：([\d\.]+)インチ/);
+      if (m) {
+        return parseFloat(m[2]);
+      } else {
+        return NaN;
+      }
+    };
+    XYGraphItem.prototype.getHDDSize = function() {
+      var m;
+      m = this.getComment().match(/HDD容量：([\d\.]+)(TB|GB)/);
+      if (m) {
+        if (m[2] === 'TB') {
+          return parseFloat(m[1]) * 1000;
+        } else {
+          return parseFloat(m[1]);
+        }
+      } else {
+        return NaN;
+      }
+    };
+    XYGraphItem.prototype.getMemorySize = function() {
+      var m;
+      m = this.getComment().match(/メモリ容量：([\d\.]+)GB/);
+      if (m) {
+        return parseFloat(m[1]);
+      } else {
+        return NaN;
+      }
+    };
+    XYGraphItem.prototype.getNoise = function() {
+      var m;
+      m = this.getComment().match(/騒音値：([\d\.]+)db/);
+      if (m) {
+        return parseFloat(m[1]);
+      } else {
+        return NaN;
+      }
+    };
+    XYGraphItem.prototype.getWeight = function() {
+      var m;
+      m = this.getComment().match(/重さ：([\d\.]+)g/);
+      if (m) {
+        return parseFloat(m[1]);
+      } else {
+        return NaN;
+      }
     };
     XYGraphItem.prototype.getCategoryName = function() {
       return this.item.find('CategoryName').eq(0).text();
     };
+    XYGraphItem.prototype.getSubCategoryName = function() {
+      var ary;
+      ary = this.getCategoryName().split('>');
+      return ary[ary.length - 1];
+    };
     XYGraphItem.prototype.getPvRanking = function() {
-      return this.parseIntOrNull(this.item.find('PvRanking').eq(0).text());
+      return parseInt(this.item.find('PvRanking').eq(0).text());
     };
     XYGraphItem.prototype.getPvRankingLog = function() {
       return Math.log(this.getPvRanking());
     };
     XYGraphItem.prototype.getTotalScoreAve = function() {
-      var f, s;
+      var s;
       s = this.item.find('TotalScoreAve').eq(0).text();
-      if (!s) {
-        return null;
-      }
-      f = parseFloat(s);
-      if (isNaN(f)) {
-        return null;
-      }
-      return f;
+      return parseFloat(s);
     };
     XYGraphItem.prototype.getImageUrl = function() {
       return this.item.find('ImageUrl').eq(0).text();
@@ -1134,21 +1419,10 @@
       return this.item.find('ReviewPageUrl').eq(0).text();
     };
     XYGraphItem.prototype.getLowestPrice = function() {
-      return this.parseIntOrNull(this.item.find('LowestPrice').eq(0).text());
+      return parseInt(this.item.find('LowestPrice').eq(0).text());
     };
     XYGraphItem.prototype.getNumOfBbs = function() {
-      return this.parseIntOrNull(this.item.find('NumOfBbs').eq(0).text());
-    };
-    XYGraphItem.prototype.parseIntOrNull = function(str) {
-      var i;
-      if (!str) {
-        return null;
-      }
-      i = parseInt(str);
-      if (isNaN(i)) {
-        return null;
-      }
-      return i;
+      return parseInt(this.item.find('NumOfBbs').eq(0).text());
     };
     XYGraphItem.prototype.getMediumImageInfo = function() {
       return ImageInfo.medium(this.item);
@@ -1160,51 +1434,43 @@
       return ImageInfo.fullscale(this.item);
     };
     XYGraphItem.prototype.getImageScale = function() {
-      var score;
+      var min, scale, score;
       score = this.getTotalScoreAve();
-      if (score) {
-        return (score * score) / (5 * 5);
+      scale = (score ? (score * score) / (5 * 5) : (3 * 3) / (5 * 5));
+      min = 0.2;
+      if (scale > min) {
+        return scale;
       } else {
-        return (2.5 * 2.5) / (5 * 5);
+        return min;
       }
     };
-    XYGraphItem.prototype.getReviewComments = function() {
-      var comments;
-      comments = [];
-      this.item.find("CustomerReviews > Review").each(function(index, elem) {
-        return comments.push({
-          summary: $(elem).find("Summary").text(),
-          content: $(elem).find("Content").text(),
-          rating: $(elem).find("Rating").number()
-        });
-      });
-      return comments;
-    };
     XYGraphItem.prototype.initImage = function() {
-      var borderColor, h, self, thumb, w, z;
+      var borderColor, h, self, w;
       self = this;
-      thumb = this.getMediumImageInfo();
-      w = Math.round(thumb.width * this.getImageScale());
-      h = Math.round(thumb.height * this.getImageScale());
-      z = this.getZIndex();
-      borderColor = '#666';
+      this.thumb = $(window).width() > 1600 ? this.getLargeImageInfo() : this.getMediumImageInfo();
+      w = Math.round(this.thumb.width * this.getImageScale());
+      h = Math.round(this.thumb.height * this.getImageScale());
+      borderColor = '#BBB';
       this.bubble = $('<div/>').css({
         position: 'absolute',
         left: 0,
         top: 0,
-        'z-index': z,
+        'z-index': self.getBubbleZIndex(),
         'line-height': 0
       });
       this.image = $('<img/>').attr({
-        src: thumb.url
+        src: self.thumb.url
       }).css({
         width: w,
         height: h,
         border: '1px solid ' + borderColor,
         padding: 2,
-        'border-radius': 5,
+        cursor: 'pointer',
+        'border-radius': 4,
+        '-moz-border-radius': 4,
         'background-color': '#FFF',
-        cursor: 'pointer'
+        'box-shadow': '3px 3px 6px rgba(0, 0, 0, 0.4)',
+        '-moz-box-shadow': '3px 3px 6px rgba(0, 0, 0, 0.4)'
       }).mouseover(__bind(function() {
         return this.onMouseover();
       }, this)).mouseout(__bind(function() {
@@ -1218,7 +1484,7 @@
         width: 0,
         height: 0,
         'margin-left': 10,
-        'border-top': '8px solid ' + borderColor,
+        'border-top': '8px solid #666',
         'border-left': '5px solid transparent',
         'border-right': '5px solid transparent'
       }).appendTo(this.bubble);
@@ -1226,13 +1492,12 @@
         position: 'absolute',
         left: 0,
         top: 0,
-        'z-index': 0,
-        padding: '3px 8px',
+        'z-index': self.getCaptionZIndex(),
+        padding: '2px 6px 6px 12px',
         width: 130,
-        color: self.getTextColor(),
-        'border': '2px solid #FFF',
-        'border-radius': 6,
-        'background-color': '#EEE',
+        color: '#444',
+        'border-top': '1px solid ' + borderColor,
+        'background-color': '#FFF',
         'font-size': '80%',
         'line-height': '1em'
       });
@@ -1258,34 +1523,24 @@
     };
     XYGraphItem.prototype.highlight = function() {
       this.bubble.css({
-        'z-index': 2000
+        'z-index': 5000 + 1
       });
       return this.caption.css({
-        'z-index': 2000,
-        'background-color': "#FF9933"
+        'z-index': 5000,
+        'background-color': "#FFBF00",
+        'font-weight': 'bold'
       });
     };
     XYGraphItem.prototype.offlight = function() {
       var self;
       self = this;
       this.bubble.css({
-        "z-index": self.getZIndex()
+        "z-index": self.getBubbleZIndex()
       });
       return this.caption.css({
-        'z-index': 0,
-        'background-color': '#EEE'
-      });
-    };
-    XYGraphItem.prototype.activateTip = function() {
-      this.tipIsActive = true;
-      return this.image.css({
-        cursor: "pointer"
-      });
-    };
-    XYGraphItem.prototype.inactivateTip = function() {
-      this.tipIsActive = false;
-      return this.image.css({
-        cursor: "crosshair"
+        'z-index': self.getCaptionZIndex(),
+        'background-color': '#FFF',
+        'font-weight': 'normal'
       });
     };
     XYGraphItem.prototype.isDetailShowing = function() {
@@ -1299,49 +1554,10 @@
         return this.detail.fadeoutAndRemove();
       }
     };
-    XYGraphItem.prototype.isTipRight = function() {
-      return this.bubble.offset().left < 400;
+    XYGraphItem.prototype.getBubbleZIndex = function() {
+      return this.getCaptionZIndex() + 1000;
     };
-    XYGraphItem.prototype.createTip = function() {
-      var isRight, self, summaryHtml;
-      self = this;
-      summaryHtml = [this.getLowestPrice() + "円", "満足度" + this.getTotalScoreAve()].join("<br />");
-      isRight = this.isTipRight();
-      return this.image.qtip({
-        content: {
-          title: self.getProductName(),
-          text: summaryHtml
-        },
-        style: {
-          name: "dark",
-          tip: {
-            corner: isRight ? "leftTop" : "rightTop"
-          },
-          border: {
-            radius: 3
-          }
-        },
-        position: {
-          corner: {
-            target: isRight ? "rightTop" : "leftTop",
-            tooltip: isRight ? "leftTop" : "rightTop"
-          },
-          adjust: {
-            y: 10
-          }
-        },
-        show: {
-          ready: true,
-          delay: 0
-        },
-        api: {
-          beforeShow: (function() {
-            return self.tipIsActive;
-          })
-        }
-      });
-    };
-    XYGraphItem.prototype.getZIndex = function() {
+    XYGraphItem.prototype.getCaptionZIndex = function() {
       if (!this.getPvRankingLog()) {
         return 0;
       }
@@ -1352,10 +1568,12 @@
       return $(container).append(this.caption);
     };
     XYGraphItem.prototype.show = function() {
-      return this.bubble.show();
+      this.bubble.show();
+      return this.caption.show();
     };
     XYGraphItem.prototype.hide = function() {
-      return this.bubble.hide();
+      this.bubble.hide();
+      return this.caption.hide();
     };
     XYGraphItem.prototype.moveTo = function(x, y) {
       var self;
@@ -1395,17 +1613,16 @@
       return y - this.bubble.height();
     };
     XYGraphItem.prototype.getCaptionLeft = function(x) {
-      return x - (10 + 5);
+      return this.getBubbleLeft(x) + this.bubble.width() - 6;
     };
     XYGraphItem.prototype.getCaptionTop = function(y) {
-      return y;
+      return this.getBubbleTop(y);
     };
     return XYGraphItem;
   })();
   $(function() {
     var xyGraphArea;
     xyGraphArea = new XYGraphArea();
-    new KakakuSearch(xyGraphArea);
     initCategorySelection();
     return initAxisMenu(xyGraphArea);
   });
@@ -1417,16 +1634,25 @@
     });
   };
   initAxisMenu = function(xyGraphArea) {
+    var item, xMenuItems, yMenuItems, _i, _j, _len, _len2;
+    xMenuItems = [['値段', AxisType.LowestPrice], ['売れ筋', AxisType.PvRanking], ['発売日', AxisType.SaleDate], ['クチコミ数', AxisType.NumOfBbs], ['満足度', AxisType.TotalScoreAve], ['モニタサイズ', AxisType.MonitorSize], ['HDD容量', AxisType.HDDSize], ['メモリ容量', AxisType.MemorySize], ['騒音値', AxisType.Noise], ['重さ', AxisType.Weight]];
+    yMenuItems = [['売れ筋', AxisType.PvRanking], ['値段', AxisType.LowestPrice], ['発売日', AxisType.SaleDate], ['クチコミ数', AxisType.NumOfBbs], ['満足度', AxisType.TotalScoreAve], ['モニタサイズ', AxisType.MonitorSize], ['HDD容量', AxisType.HDDSize], ['メモリ容量', AxisType.MemorySize], ['騒音値', AxisType.Noise], ['重さ', AxisType.Weight]];
+    for (_i = 0, _len = xMenuItems.length; _i < _len; _i++) {
+      item = xMenuItems[_i];
+      $('#x-axis-menu').append($('<option/>').text(item[0]).val(item[1]));
+    }
+    for (_j = 0, _len2 = yMenuItems.length; _j < _len2; _j++) {
+      item = yMenuItems[_j];
+      $('#y-axis-menu').append($('<option/>').text(item[0]).val(item[1]));
+    }
     $('#x-axis-menu').change(function() {
       var value;
       value = $(this).val();
-      $.log(value);
       return xyGraphArea.switchXAxis(value);
     });
     return $('#y-axis-menu').change(function() {
       var value;
       value = $(this).val();
-      $.log(value);
       return xyGraphArea.switchYAxis(value);
     });
   };

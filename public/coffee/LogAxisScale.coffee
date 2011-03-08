@@ -1,14 +1,15 @@
 class LogAxisScale extends AxisScale
-  constructor: (thick, scaleMode, unit) ->
-    super(thick, scaleMode, unit)
+  constructor: (thick, scaleMode, unit, @paddingHead=0, @paddingFoot=0) ->
+    super(thick, scaleMode, unit, @paddingHead, @paddingFoot)
 
   getLogPos: (value, range) ->
-    (Math.log(value) - range.getLogFirst()) *
-      @getScaleLength() /
-        range.getLogDifference()
+    @paddingHead +
+      (Math.log(value) - range.getLogFirst()) *
+      @getScaleBodyLength() / range.getLogDifference()
 
   update_: ->
     return if (!@range)
+    # 消去
     @ctx.clearRect(0, 0, @getWidth(), @getHeight())
     @removeAllTexts()
 

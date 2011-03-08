@@ -51,11 +51,11 @@ class Selector
     newWidth = x - @startX
     newHeight = y - @startY
     if (newWidth < 0)
-        newX = x
-        newWidth = Math.abs(newWidth)
+      newX = x
+      newWidth = Math.abs(newWidth)
     if (newHeight < 0)
-        newY = y
-        newHeight = Math.abs(newHeight)
+      newY = y
+      newHeight = Math.abs(newHeight)
     @frame.css {
       left: newX
       top: newY

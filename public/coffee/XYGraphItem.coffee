@@ -6,16 +6,26 @@ class XYGraphItem
 
   getAxisValue: (axisType) ->
     switch(axisType)
-      when AxisType.SaleDate
-        @getSaleDateTime()
-      when AxisType.PvRanking
+      when AxisType.SaleDate ## 発売日
+        @getSaleDateTimeAgo()
+      when AxisType.PvRanking ## 売れ筋
         @getPvRanking()
-      when AxisType.TotalScoreAve
+      when AxisType.TotalScoreAve ## 満足度
         @getTotalScoreAve()
       when AxisType.LowestPrice
         @getLowestPrice()
       when AxisType.NumOfBbs
         @getNumOfBbs()
+      when AxisType.MonitorSize
+        @getMonitorSize()
+      when AxisType.HDDSize
+        @getHDDSize()
+      when AxisType.MemorySize
+        @getMemorySize()
+      when AxisType.Noise
+        @getNoise()
+      when AxisType.Weight
+        @getWeight()
       else
         $.log "No such AxisType: " + axisType
 
@@ -50,24 +60,70 @@ class XYGraphItem
     else
       null
 
+  getSaleDateTimeAgo: ->
+    dateTime = @getSaleDateTime()
+    if dateTime
+      (new Date()).getTime() - dateTime
+    else
+      null
+
   getComment: ->
     @item.find('Comment').eq(0).text()
+
+  getMonitorSize: ->
+    m = @getComment().match(/(画面|液晶|モニタ)サイズ：([\d\.]+)インチ/)
+    if m
+      parseFloat(m[2])
+    else
+      NaN
+
+  getHDDSize: ->
+    m = @getComment().match(/HDD容量：([\d\.]+)(TB|GB)/)
+    if m
+      if m[2] == 'TB'
+        parseFloat(m[1]) * 1000
+      else
+        parseFloat(m[1])
+    else
+      NaN
+
+  getMemorySize: ->
+    m = @getComment().match(/メモリ容量：([\d\.]+)GB/)
+    if m
+      parseFloat(m[1])
+    else
+      NaN
+
+  getNoise: ->
+    m = @getComment().match(/騒音値：([\d\.]+)db/)
+    if m
+      parseFloat(m[1])
+    else
+      NaN
+
+  getWeight: ->
+    m = @getComment().match(/重さ：([\d\.]+)g/)
+    if m
+      parseFloat(m[1])
+    else
+      NaN
 
   getCategoryName: ->
     @item.find('CategoryName').eq(0).text()
 
+  getSubCategoryName: ->
+    ary = @getCategoryName().split('>')
+    ary[ary.length - 1]
+
   getPvRanking: ->
-    @parseIntOrNull( @item.find('PvRanking').eq(0).text() )
+    parseInt( @item.find('PvRanking').eq(0).text() )
 
   getPvRankingLog: ->
     Math.log(@getPvRanking())
 
   getTotalScoreAve: ->
     s = @item.find('TotalScoreAve').eq(0).text()
-    return null if !s
-    f = parseFloat(s)
-    return null if isNaN(f)
-    f
+    parseFloat(s)
 
   getImageUrl: ->
     @item.find('ImageUrl').eq(0).text()
@@ -82,16 +138,10 @@ class XYGraphItem
     @item.find('ReviewPageUrl').eq(0).text()
 
   getLowestPrice: ->
-    @parseIntOrNull( @item.find('LowestPrice').eq(0).text() )
+    parseInt( @item.find('LowestPrice').eq(0).text() )
 
   getNumOfBbs: ->
-    @parseIntOrNull( @item.find('NumOfBbs').eq(0).text() )
-
-  parseIntOrNull: (str) ->
-    return null if !str
-    i = parseInt(str)
-    return null if isNaN(i)
-    i
+    parseInt( @item.find('NumOfBbs').eq(0).text() )
 
   getMediumImageInfo: ->
     ImageInfo.medium(@item)
@@ -104,51 +154,46 @@ class XYGraphItem
 
   getImageScale: ->
     score = @getTotalScoreAve()
-    if score
+    scale = (if score
       (score*score) / (5*5)
     else
-      (2.5*2.5) / (5*5)
-
-  getReviewComments: ->
-    comments = []
-    @item.find("CustomerReviews > Review").each((index, elem) ->
-        comments.push({
-            summary: $(elem).find("Summary").text(),
-            content: $(elem).find("Content").text(),
-            rating:  $(elem).find("Rating").number()
-        })
+      (3*3) / (5*5)
     )
-    comments
+    min = 0.2
+    if scale > min then scale else min
 
   #
   # 画像
   #
   initImage: ->
     self = this
-    thumb = @getMediumImageInfo()
-    w = Math.round(thumb.width  * @getImageScale())
-    h = Math.round(thumb.height * @getImageScale())
-    z = @getZIndex()
-    borderColor = '#666'
+    @thumb = if ($(window).width() > 1600) then @getLargeImageInfo() else @getMediumImageInfo()
+    w = Math.round(@thumb.width  * @getImageScale())
+    h = Math.round(@thumb.height * @getImageScale())
+    borderColor = '#BBB'
+
 
     @bubble = $('<div/>').css({
       position: 'absolute',
       left: 0,
       top: 0,
-      'z-index': z
+      'z-index': self.getBubbleZIndex()
       'line-height': 0
     })
 
     @image = $('<img/>').attr({
-      src: thumb.url
+      src: self.thumb.url
     }).css({
       width: w
       height: h
       border: '1px solid ' + borderColor
       padding: 2
-      'border-radius': 5
-      'background-color': '#FFF'
       cursor: 'pointer'
+      'border-radius': 4
+      '-moz-border-radius': 4
+      'background-color': '#FFF'
+      'box-shadow': '3px 3px 6px rgba(0, 0, 0, 0.4)'
+      '-moz-box-shadow': '3px 3px 6px rgba(0, 0, 0, 0.4)'
     }).mouseover( =>
       @onMouseover()
     ).mouseout( =>
@@ -164,7 +209,7 @@ class XYGraphItem
       width: 0
       height: 0
       'margin-left': 10
-      'border-top':   '8px solid ' + borderColor
+      'border-top':   '8px solid #666'
       'border-left':  '5px solid transparent'
       'border-right': '5px solid transparent'
     }).appendTo(@bubble)
@@ -176,13 +221,12 @@ class XYGraphItem
       position: 'absolute',
       left: 0,
       top: 0,
-      'z-index': 0
-      padding: '3px 8px'
+      'z-index': self.getCaptionZIndex()
+      padding: '2px 6px 6px 12px'
       width: 130
-      color: self.getTextColor()
-      'border': '2px solid #FFF'
-      'border-radius': 6
-      'background-color': '#EEE'
+      color: '#444'
+      'border-top': '1px solid ' + borderColor
+      'background-color': '#FFF'
       'font-size': '80%'
       'line-height': '1em'
     })
@@ -205,37 +249,39 @@ class XYGraphItem
 
   highlight: ->
     @bubble.css({
-      'z-index': 2000
+      'z-index': 5000 + 1
     })
     @caption.css({
-      'z-index': 2000
-      'background-color': "#FF9933"
+      'z-index': 5000
+      'background-color': "#FFBF00"
+      'font-weight': 'bold'
     })
 
   offlight: ->
     self = this
     @bubble.css({
-      "z-index": self.getZIndex()
+      "z-index": self.getBubbleZIndex()
     })
     @caption.css({
-      'z-index': 0
-      'background-color': '#EEE'
+      'z-index': self.getCaptionZIndex()
+      'background-color': '#FFF'
+      'font-weight': 'normal'
     })
 
   #
   # Tip
   #
-  activateTip: ->
-    @tipIsActive = true
-    @image.css({
-        cursor: "pointer"
-    })
+  # activateTip: ->
+  #   @tipIsActive = true
+  #   @image.css({
+  #       cursor: "pointer"
+  #   })
 
-  inactivateTip: ->
-    @tipIsActive = false
-    @image.css({
-        cursor: "crosshair"
-    })
+  # inactivateTip: ->
+  #   @tipIsActive = false
+  #   @image.css({
+  #       cursor: "crosshair"
+  #   })
 
   isDetailShowing: ->
     return false if (!@detail)
@@ -244,49 +290,52 @@ class XYGraphItem
   removeDetail: ->
     @detail.fadeoutAndRemove() if @detail
 
-  isTipRight: ->
-    (@bubble.offset().left < 400)
+  # isTipRight: ->
+  #   (@bubble.offset().left < 400)
 
-  createTip: -> # Summary tip while mouseover
-    self = this
-    summaryHtml = ([
-      @getLowestPrice() + "円",
-      "満足度" + @getTotalScoreAve()
-    ]).join("<br />")
-    isRight = @isTipRight()
-    @image.qtip({
-        content: {
-            title: self.getProductName(),
-            text: summaryHtml
-        },
-        style: {
-            name: "dark",
-            tip: {
-                corner: if isRight then "leftTop" else "rightTop"
-            },
-            border: {
-                radius: 3
-            }
-        },
-        position: {
-            corner: {
-                target: if isRight then "rightTop" else "leftTop",
-                tooltip: if isRight then "leftTop" else "rightTop"
-            },
-            adjust: {
-                y: 10
-            }
-        },
-        show: {
-            ready: true,
-            delay: 0
-        },
-        api: {
-            beforeShow: (-> self.tipIsActive)
-        }
-    })
+  # createTip: -> # Summary tip while mouseover
+  #   self = this
+  #   summaryHtml = ([
+  #     @getLowestPrice() + "円",
+  #     "満足度" + @getTotalScoreAve()
+  #   ]).join("<br />")
+  #   isRight = @isTipRight()
+  #   @image.qtip({
+  #       content: {
+  #           title: self.getProductName(),
+  #           text: summaryHtml
+  #       },
+  #       style: {
+  #           name: "dark",
+  #           tip: {
+  #               corner: if isRight then "leftTop" else "rightTop"
+  #           },
+  #           border: {
+  #               radius: 3
+  #           }
+  #       },
+  #       position: {
+  #           corner: {
+  #               target: if isRight then "rightTop" else "leftTop",
+  #               tooltip: if isRight then "leftTop" else "rightTop"
+  #           },
+  #           adjust: {
+  #               y: 10
+  #           }
+  #       },
+  #       show: {
+  #           ready: true,
+  #           delay: 0
+  #       },
+  #       api: {
+  #           beforeShow: (-> self.tipIsActive)
+  #       }
+  #   })
 
-  getZIndex: ->
+  getBubbleZIndex: ->
+    @getCaptionZIndex() + 1000
+
+  getCaptionZIndex: ->
     return 0 if !@getPvRankingLog()
     Math.round(
         1000 * @getImageScale()
@@ -299,9 +348,11 @@ class XYGraphItem
 
   show: ->
     @bubble.show()
+    @caption.show()
 
   hide: ->
     @bubble.hide()
+    @caption.hide()
 
   moveTo: (x, y) ->
     self = this
@@ -331,14 +382,13 @@ class XYGraphItem
     })
 
   getBubbleLeft: (x) ->
-    ## triangle の margin-left + width/2
     x - (10 + 5)
 
   getBubbleTop: (y) ->
     y - @bubble.height()
 
   getCaptionLeft: (x) ->
-    x - (10 + 5)
+    @getBubbleLeft(x) + @bubble.width() - 6
 
   getCaptionTop: (y) ->
-    y
+    @getBubbleTop(y)

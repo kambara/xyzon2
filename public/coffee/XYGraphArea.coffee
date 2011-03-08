@@ -2,25 +2,46 @@
 
 class XYGraphArea
   constructor: ->
+    params = Util.getLocationParams()
+    @subCategoryName = if params['sub'] then decodeURIComponent(params['sub']) else null
+    if @subCategoryName
+      $('#sub-category').text(@subCategoryName)
+    @categoryList = new CategoryList()
     @graphItems = []
-    @xAxis = new Axis(AxisType.LowestPrice)
-    @yAxis = new Axis(AxisType.PvRanking)
-    @reset_()
+    @paddingTop = 70
+    @paddingBottom = 10
+    @paddingLeft = 30
+    @paddingRight = 200
+    if ($(window).width() > 1600)
+      @paddingTop += 80
+      @paddingRight += 80
 
-    # ItemContainer
-    @itemContainer = @createItemContainer()
-    $(document.body).append(@itemContainer)
+    # ItemContainer初期化
+    @itemContainer = @createItemContainer().appendTo(document.body)
 
-    # Selector
+    # Selector初期化
     @selector = new Selector()
     @selector.hide()
 
-    $(window).resize =>
-      @onWindowResize()
+    # Axis初期化
+    @xAxis = new Axis(AxisType.LowestPrice)
+    @yAxis = new Axis(AxisType.PvRanking)
+    @onAxisReset()
 
+    # リサイズ
     @onWindowResize()
+    $(window).resize => @onWindowResize()
 
-  reset_: ->
+    # 検索開始
+    kakakuSearch = new KakakuSearch()
+    kakakuSearch.bind(KakakuSearch.ITEM_ELEMENT, ( (evt, elem) =>
+      @appendItem elem
+    ))
+    kakakuSearch.bind(KakakuSearch.COMPLETE, ( =>
+      @updateRecommendCategory()
+    ))
+
+  onAxisReset: ->
     # Rangeなど初期化
     @minXValue_ = null
     @maxXValue_ = null
@@ -32,15 +53,15 @@ class XYGraphArea
     @yCurrentAxisRange = new Range(0, 0)
     @rangeHistories = []
 
-    # ラベル
+    # ラベル書き換え
     $('#x-axis-label').text(@xAxis.getLabel())
     $('#y-axis-label').text(@yAxis.getLabel())
 
     # 古いAxisScaleを消して作り直す
-    @xAxisScale.remove() if (@xAxisScale)
-    @yAxisScale.remove() if (@yAxisScale)
-    @xAxisScale = @xAxis.getScale(ScaleMode.HORIZONTAL)
-    @yAxisScale = @yAxis.getScale(ScaleMode.VERTICAL)
+    @xAxisScale.remove() if @xAxisScale
+    @yAxisScale.remove() if @yAxisScale
+    @xAxisScale = @xAxis.createScale(ScaleMode.HORIZONTAL, @paddingLeft, @paddingRight)
+    @yAxisScale = @yAxis.createScale(ScaleMode.VERTICAL, @paddingTop, @paddingBottom)
 
     # AxisRangeを再設定（初回は0個なので関係ない）
     for graphItem in @graphItems
@@ -50,29 +71,30 @@ class XYGraphArea
   switchXAxis: (axisType) ->
     delete @xAxis
     @xAxis = new Axis(axisType)
-    @reset_()
+    @onAxisReset()
     @onWindowResize()
 
   switchYAxis: (axisType) ->
     delete @yAxis
     @yAxis = new Axis(axisType)
-    @reset_()
+    @onAxisReset()
     @onWindowResize()
 
   onWindowResize: ->
+    $('body').height( $(window).height() ) ## 画面全体でマウスイベント取得するため
     @width  = $(window).width() - $('#x-menu-box').outerWidth() - 100
-    @height = $(window).height() - $('#header').outerHeight() - 34
+    @height = $(window).height() - $('#header').outerHeight() - 50
 
-    # Resize ItemContainer
+    # ItemContainerをリサイズ
     @itemContainer.width(@width).height(@height).css({
       left: $('#x-menu-box').outerWidth()
       top:  $('#header').outerHeight()
     })
 
-    # itemContainer 再描画
+    # ItemContainerを再描画
     @adjustGraphItems()
 
-    # Resize AxisScale
+    # ItemContainerにあわせてAxisScaleをリサイズ
     offset = @itemContainer.offset()
     rect = {
       left:   offset.left
@@ -87,11 +109,11 @@ class XYGraphArea
     @xAxisScale.setLength(rect.width)
     @yAxisScale.setLength(rect.height)
 
-    # Selector Limit
-    @selector.setLimitRect(rect.left,
-                           rect.top,
-                           rect.width,
-                           rect.height)
+    # SelectorのLimit
+    @selector.setLimitRect(offset.left,
+                           offset.top,
+                           @itemContainer.innerWidth(),
+                           @itemContainer.innerHeight())
     # Move Axis Label
     yMenuBox = $('#y-menu-box')
     yMenuBox.css({
@@ -102,11 +124,10 @@ class XYGraphArea
   createItemContainer: ->
     div = $("<div/>").unselectable().css({
       border: "1px solid #555"
-      "background-color": "#FFF"
+      'background-color': "#FFF"
       position: 'absolute'
-      cursor: "crosshair"
+      cursor:   "crosshair"
       overflow: "hidden"
-      "float": "left"
     }).mousedown((event) =>
       @onMousedown(event)
     )
@@ -131,8 +152,8 @@ class XYGraphArea
     @dragging = true
     @selector.start(event.pageX, event.pageY)
     @selector.show()
-    for item in @graphItems
-      item.inactivateTip()
+    # for item in @graphItems
+    #   item.inactivateTip()
 
   isAnyDetailShowing: ->
     $.any(@graphItems, (i, item) -> item.isDetailShowing())
@@ -168,8 +189,8 @@ class XYGraphArea
           @calcYValue(rect.getBottom())
         )
       )
-    for item in @graphItems
-      item.activateTip()
+    # for item in @graphItems
+    #   item.activateTip()
 
   setLocationHash: (xRange, yRange) ->
     params = []
@@ -202,13 +223,21 @@ class XYGraphArea
         @setCurrentAxisRange(ranges.xAxisRange, ranges.yAxisRange)
 
   adjustGraphItems: ->
-    self = this
     for item in @graphItems
-      item.animateMoveTo(
-        @calcXCoord(item.getAxisValue(@xAxis.axisType)),
-        @calcYCoord(item.getAxisValue(@yAxis.axisType))
-      )
+      xValue = item.getAxisValue(@xAxis.axisType)
+      yValue = item.getAxisValue(@yAxis.axisType)
+      if xValue? and !isNaN(xValue) and yValue? and !isNaN(yValue)
+        item.animateMoveTo(
+          @calcXCoord(xValue),
+          @calcYCoord(yValue)
+        )
+        item.show()
+      else
+        item.hide()
 
+  #
+  # 座標から値に変換
+  #
   calcXValue: (x) ->
     if @xAxis.isLogScale()
       Math.exp(
@@ -229,38 +258,54 @@ class XYGraphArea
       @yCurrentAxisRange.first +
         (@yCurrentAxisRange.getDifference() * y / @height)
 
+  #
+  # 値から実際の座標に変換
+  #
   calcXCoord: (value) ->
-    if @xAxis.isLogScale()
-      Math.round(
-        @width *
+    @paddingLeft +
+    Math.round(
+      if @xAxis.isLogScale()
+        @getBodyWidth() *
         (Math.log(value) - @xCurrentAxisRange.getLogFirst()) /
         @xCurrentAxisRange.getLogDifference()
-      )
-    else
-      Math.round(
-        @width *
+      else
+        @getBodyWidth() *
         (value - @xCurrentAxisRange.first) /
         @xCurrentAxisRange.getDifference()
-      )
+    )
 
   calcYCoord: (value) ->
-    if @yAxis.isLogScale()
-      Math.round(
-        @height *
+    @paddingTop +
+    Math.round(
+      if @yAxis.isLogScale()
+        @getBodyHeight() *
         (Math.log(value) - @yCurrentAxisRange.getLogFirst()) /
         @yCurrentAxisRange.getLogDifference()
-      )
-    else
-      Math.round(
-        @height *
+      else
+        @getBodyHeight() *
         (value - @yCurrentAxisRange.first) /
         @yCurrentAxisRange.getDifference()
-      )
+    )
 
+  getBodyWidth: ->
+    @width - @paddingLeft - @paddingRight
+
+  getBodyHeight: ->
+    @height - @paddingTop - @paddingBottom
+
+  #
+  # アイテム追加
+  #
   appendItem: (itemXmlElem) ->
     graphItem = new XYGraphItem(itemXmlElem)
     return if (!graphItem.getLowestPrice()) # 値段は必須
-    #$.log(graphItem.getLowestPrice())
+
+    # アイテムは追加しなくてもカテゴリリストには追加しておく
+    @categoryList.add(graphItem.getCategoryName())
+
+    # サブカテゴリが指定されている場合は絞り込む
+    if @subCategoryName
+      return if (@subCategoryName != graphItem.getSubCategoryName())
 
     @graphItems.push(graphItem)
     graphItem.render(@itemContainer)
@@ -305,32 +350,10 @@ class XYGraphArea
         )
 
   setMaxAxisRange: (xRange, yRange) ->
-    paddingRight = 100
-    paddingBottom = 120
-
-    @xMaxAxisRange = @extendRange(xRange,
-                                          paddingRight,
-                                          @width,
-                                          @xAxis.isLogScale())
-    @yMaxAxisRange = @extendRange(yRange,
-                                          paddingBottom,
-                                          @height,
-                                          @yAxis.isLogScale())
+    @xMaxAxisRange = xRange
+    @yMaxAxisRange = yRange
     if (@rangeHistories.length == 0)
-        @setCurrentAxisRange(xRange, yRange)
-
-  extendRange: (range, lastPaddingPixel, lengthPixel, isLog) ->
-    if (isLog)
-      range.last = Math.exp(
-        range.getLogLast() +
-          (lastPaddingPixel *
-            range.getLogDifference() / lengthPixel)
-      )
-    else
-      range.last = range.last +
-        (lastPaddingPixel *
-          range.getDifference() / lengthPixel)
-    range
+      @setCurrentAxisRange(xRange, yRange)
 
   setCurrentAxisRange: (xRange, yRange) ->
     @xCurrentAxisRange = xRange
@@ -339,3 +362,35 @@ class XYGraphArea
     @yAxisScale.setRange(yRange)
     @adjustGraphItems()
 
+  updateRecommendCategory: () ->
+    params = Util.getLocationParams()
+    categoryKey = params['category']
+    if categoryKey and categoryKey != 'ALL'
+      names = @categoryList.recommendSub(categoryKey).slice(0, 3)
+      @appendRecommendSubCategories(categoryKey, names)
+    else
+      names = @categoryList.recommend().slice(0, 3)
+      @appendRecommendCategories(names)
+
+  appendRecommendCategories: (names) ->
+    container = $('#sub-category')
+    params = Util.getLocationParams()
+    keyword = params['keyword']
+    for name in names
+      key = Category.getKeyFrom(name)
+      link = $('<a/>').attr({
+        href: "/search?keyword=#{keyword}&category=#{key}"
+      }).addClass('recommend').text(name)
+      container.append(link)
+
+  appendRecommendSubCategories: (categoryKey, names) ->
+    container = $('#sub-category')
+    params = Util.getLocationParams()
+    keyword = params['keyword']
+    for name in names
+      continue if @subCategoryName and (name == @subCategoryName)
+      sub = encodeURIComponent(name)
+      link = $('<a/>').attr({
+        href: "/search?keyword=#{keyword}&category=#{categoryKey}&sub=#{sub}"
+      }).addClass('recommend').text(name)
+      container.append(link)

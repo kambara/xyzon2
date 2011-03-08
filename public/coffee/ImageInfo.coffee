@@ -17,7 +17,7 @@ class ImageInfo
   @fullscale: (item) ->
     url = ImageInfo.getUrlFrom(item)
     url = url.replace(/\/m\//, '/fullscale/') if url
-    new ImageInfo(url, 626, 470)
+    new ImageInfo(url, 626/2, 470/2)
 
   @getUrlFrom: (item) ->
     item.find("ImageUrl").text()

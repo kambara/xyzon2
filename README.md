@@ -5,11 +5,9 @@
 XYzon requires [appengine-jruby](http://code.google.com/p/appengine-jruby/).
 
     $ sudo gem install jbundle
-    $ sudo gem install google-appengine -v "1.4.0"
-    $ sudo gem install appengine-sdk -v "0.0.19"
+    $ sudo gem install google-appengine -v "0.0.19"
+    $ sudo gem install appengine-sdk -v "1.4.0"
     $ sudo gem install bundle
-
-    ## $ sudo gem install google-appengine
 
 ## Run
 

@@ -3,6 +3,7 @@ require 'pp'
 require 'base64'
 require 'rexml/document'
 require 'appengine-apis/urlfetch'
+require 'appengine-apis/memcache'
 require 'hmac/sha2' ## from ruby-openid
 
 module Kakaku
@@ -64,7 +65,13 @@ module Kakaku
     end
 
     def fetch
-      AppEngine::URLFetch.fetch(make_url).body
+      url = make_url
+      memcache = AppEngine::Memcache.new
+      body = memcache.get(url)
+      return body if body
+      body = AppEngine::URLFetch.fetch(url).body
+      memcache.set(url, body, 24 * 60 * 60)
+      body
     end
 
     def make_url
@@ -101,10 +108,10 @@ module Kakaku
       'Kaden'  => '家電',
       'Camera' => 'カメラ',
       'Game'   => 'ゲーム',
-      'Gakki'  => '楽器',
+#      'Gakki'  => '楽器',
       'Kuruma' => '自動車・バイク',
       'Sports' => 'スポーツ・レジャー',
-      'Brand'  => 'ブランド・腕時計',
+#      'Brand'  => 'ブランド・腕時計',
       'Baby'   => 'ベビー・キッズ',
       'Pet'    => 'ペット',
       'Beauty_Health' => 'ビューティー・ヘルス'

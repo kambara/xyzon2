@@ -1,6 +1,5 @@
 $ ->
   xyGraphArea = new XYGraphArea()
-  new KakakuSearch(xyGraphArea)
   initCategorySelection()
   initAxisMenu(xyGraphArea)
 
@@ -11,13 +10,41 @@ initCategorySelection = ->
       $(formElem).submit()
 
 initAxisMenu = (xyGraphArea) ->
+  xMenuItems = [
+    ['値段', AxisType.LowestPrice]
+    ['売れ筋', AxisType.PvRanking]
+    ['発売日', AxisType.SaleDate]
+    ['クチコミ数', AxisType.NumOfBbs]
+    ['満足度', AxisType.TotalScoreAve]
+    ['モニタサイズ', AxisType.MonitorSize]
+    ['HDD容量', AxisType.HDDSize]
+    ['メモリ容量', AxisType.MemorySize]
+    ['騒音値', AxisType.Noise]
+    ['重さ', AxisType.Weight]
+  ]
+  yMenuItems = [
+    ['売れ筋', AxisType.PvRanking]
+    ['値段', AxisType.LowestPrice]
+    ['発売日', AxisType.SaleDate]
+    ['クチコミ数', AxisType.NumOfBbs]
+    ['満足度', AxisType.TotalScoreAve]
+    ['モニタサイズ', AxisType.MonitorSize]
+    ['HDD容量', AxisType.HDDSize]
+    ['メモリ容量', AxisType.MemorySize]
+    ['騒音値', AxisType.Noise]
+    ['重さ', AxisType.Weight]
+  ]
+  for item in xMenuItems
+    $('#x-axis-menu').append(
+      $('<option/>').text(item[0]).val(item[1]))
+  for item in yMenuItems
+    $('#y-axis-menu').append(
+      $('<option/>').text(item[0]).val(item[1]))
   $('#x-axis-menu').change ->
     value = $(this).val()
-    $.log value
     xyGraphArea.switchXAxis value
   $('#y-axis-menu').change ->
     value = $(this).val()
-    $.log value
     xyGraphArea.switchYAxis value
 
 #

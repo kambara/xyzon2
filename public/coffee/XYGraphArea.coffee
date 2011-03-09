@@ -5,14 +5,18 @@ class XYGraphArea
     params = Util.getLocationParams()
     @subCategoryName = if params['sub'] then decodeURIComponent(params['sub']) else null
     if @subCategoryName
-      $('#sub-category').text(@subCategoryName)
+      $('#sub-category').append(
+        $('<span/>').html('&#155; ')
+      ).append(
+        $('<span/>').text(@subCategoryName)
+      )
     @categoryList = new CategoryList()
     @graphItems = []
-    @paddingTop = 70
+    @paddingTop = 80
     @paddingBottom = 10
     @paddingLeft = 30
     @paddingRight = 200
-    if ($(window).width() > 1600)
+    if ($(window).width() > 1800)
       @paddingTop += 80
       @paddingRight += 80
 

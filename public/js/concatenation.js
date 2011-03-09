@@ -726,15 +726,15 @@
       params = Util.getLocationParams();
       this.subCategoryName = params['sub'] ? decodeURIComponent(params['sub']) : null;
       if (this.subCategoryName) {
-        $('#sub-category').text(this.subCategoryName);
+        $('#sub-category').append($('<span/>').html('&#155; ')).append($('<span/>').text(this.subCategoryName));
       }
       this.categoryList = new CategoryList();
       this.graphItems = [];
-      this.paddingTop = 70;
+      this.paddingTop = 80;
       this.paddingBottom = 10;
       this.paddingLeft = 30;
       this.paddingRight = 200;
-      if ($(window).width() > 1600) {
+      if ($(window).width() > 1800) {
         this.paddingTop += 80;
         this.paddingRight += 80;
       }
@@ -1089,16 +1089,22 @@
     function XYGraphDetail(graphItem) {
       this.graphItem = graphItem;
       this.isAlive = true;
-      this.image = this.appendImage(graphItem);
+      this.appendImage(this.graphItem);
     }
     XYGraphDetail.prototype.appendImage = function(graphItem) {
-      var bottom, image, left, medium, offset, right, rightMargin, self, thumb, tipWidth, top, viewportSize;
+      var bottom, checkLabel, checkLabelContainer, checkbox, description, fullscale, h, image, left, offset, right, rightMargin, self, tipWidth, title, top, w;
       self = this;
       offset = graphItem.image.offset();
-      thumb = graphItem.thumb;
+      fullscale = graphItem.getFullscaleImageInfo();
       image = $("<img/>").attr({
-        src: thumb.url
+        src: graphItem.thumb.url
       }).css({
+        width: '100%',
+        height: '100%'
+      }).mousemove(function(event) {
+        return event.preventDefault();
+      });
+      this.container = $('<div/>').css({
         position: "absolute",
         left: offset.left,
         top: offset.top,
@@ -1109,124 +1115,79 @@
         'border-radius': 4,
         '-moz-border-radius': 4,
         'background-color': graphItem.image.css('background-color'),
-        'z-index': 6000,
+        'z-index': 6000 + 1,
         'box-shadow': '3px 3px 10px rgba(0, 0, 0, 0.3)',
         '-moz-box-shadow': '3px 3px 10px rgba(0, 0, 0, 0.3)'
-      }).mousemove(function(event) {
-        return event.preventDefault();
-      }).appendTo('body');
-      medium = graphItem.getFullscaleImageInfo();
-      viewportSize = {
-        width: $(window).width(),
-        height: $(window).height()
-      };
-      left = offset.left - (medium.width - graphItem.image.width()) / 2;
-      top = offset.top - (medium.height - graphItem.image.height()) / 2;
-      right = left + medium.width;
-      bottom = top + medium.height;
-      rightMargin = viewportSize.width - (left + medium.width);
-      tipWidth = 300 + 50;
-      if (left < tipWidth && rightMargin < tipWidth) {
-        if (left < rightMargin) {
-          left = viewportSize.width - tipWidth - medium.width;
+      }).append(image).appendTo(document.body);
+      title = $("<h2 style='margin: 0; padding: 5px 15px; font-size: 110%; background-color: #444'>\n  <a href='" + (graphItem.getItemPageUrl()) + "' target='_blank' style='color: #FFF;'>\n    " + (graphItem.getProductName()) + "\n  </a>\n</h2>");
+      checkbox = $('<input type="checkbox" />').change(__bind(function() {
+        if (checkbox.attr('checked')) {
+          this.graphItem.interest();
+          return this.container.css({
+            'background-color': '#FFBF00'
+          });
         } else {
-          left = tipWidth;
+          this.graphItem.uninterest();
+          return this.container.css({
+            'background-color': '#FFF'
+          });
         }
+      }, this));
+      if (localStorage.getItem(graphItem.getProductID())) {
+        checkbox.attr('checked', true);
       }
+      checkLabel = $('<label style="cursor: pointer;" />').append(checkbox).append('興味あり');
+      checkLabelContainer = $('<div style="float:right; margin: 5px 10px;" />').append(checkLabel);
+      description = $("<div>\n  <ul>\n    <li>" + (graphItem.getLowestPrice()) + " 円</li>\n    <li>満足度 " + (graphItem.getTotalScoreAve() || '?') + "</li>\n    <li>売れ筋ランキング： " + (graphItem.getPvRanking()) + " 位</li>\n    <li>発売日： " + (graphItem.getSaleDateString() || '不明') + "</li>\n  </ul>\n  <p style='font-size: 90%; margin-left: 15px'>\n    " + (graphItem.getComment()) + "\n    <br />\n    <a href='" + (graphItem.getReviewPageUrl()) + "' target='_blank'>レビュー</a>\n    |\n    <a href='" + (graphItem.getBbsPageUrl()) + "' target='_blank'>クチコミ</a>\n  </p>\n</div>");
+      this.body = $('<div/>').css({
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: 300,
+        height: fullscale.height + 4,
+        border: '1px solid #444',
+        color: '#444',
+        'font-size': '90%',
+        'background-color': '#EEE',
+        'z-index': 6000,
+        'padding': '0px',
+        overflow: 'auto'
+      }).append(title).append(checkLabelContainer).append(description).mousedown(function(event) {
+        return event.stopPropagation();
+      }).hide().appendTo(document.body);
+      w = fullscale.width + this.body.width() + 30;
+      h = fullscale.height + 10;
+      left = offset.left - (fullscale.width - graphItem.image.width()) / 2;
+      top = offset.top - (h - graphItem.image.height()) / 2;
+      right = left + w;
+      bottom = top + h;
+      rightMargin = $(window).width() - right;
+      tipWidth = this.body.width();
       if (left < 0) {
         left = 0;
-      } else if (right > viewportSize.width) {
-        left = viewportSize.width - medium.width;
+      } else if (right > $(window).width()) {
+        left = $(window).width() - w;
       }
       if (top < 0) {
         top = 0;
-      } else if (bottom > viewportSize.height) {
-        top = viewportSize.height - medium.height;
+      } else if (bottom > $(window).height()) {
+        top = $(window).height() - h;
       }
-      image.animate({
+      return this.container.animate({
         left: left,
         top: top,
-        width: medium.width,
-        height: medium.height
-      }, "fast", null, function() {
-        self.tip = self.appendTip(graphItem);
+        width: fullscale.width,
+        height: fullscale.height
+      }, "fast", null, (__bind(function() {
+        offset = this.container.offset();
+        this.body.css({
+          left: offset.left + this.container.width(),
+          top: offset.top
+        }).fadeIn('fast');
         return image.attr({
-          src: medium.url
+          src: fullscale.url
         });
-      });
-      return image;
-    };
-    XYGraphDetail.prototype.isTipRight = function() {
-      return this.image.offset().left < 330;
-    };
-    XYGraphDetail.prototype.appendTip = function(graphItem) {
-      var isRight, self, summaryHtml, tip;
-      self = this;
-      summaryHtml = [graphItem.getLowestPrice() + "円", "満足度：" + (graphItem.getTotalScoreAve() || '?'), "売れ筋ランキング：" + graphItem.getPvRanking() + "位", "発売日：" + (graphItem.getSaleDateString() || '?'), graphItem.getComment()].join("<br />");
-      isRight = this.isTipRight();
-      tip = this.image.qtip({
-        content: {
-          title: '<a href="' + graphItem.getItemPageUrl() + '" target="_blank" style="color:#FFFFFF">' + graphItem.getProductName() + '</a>',
-          text: summaryHtml
-        },
-        style: {
-          name: "dark",
-          tip: {
-            corner: isRight ? "leftTop" : "rightTop"
-          },
-          border: {
-            radius: 3
-          },
-          width: {
-            max: 300
-          },
-          title: {
-            "font-size": "110%"
-          },
-          button: {
-            "font-size": "100%"
-          }
-        },
-        position: {
-          corner: {
-            target: isRight ? "rightTop" : "leftTop",
-            tooltip: isRight ? "leftTop" : "rightTop"
-          },
-          adjust: {
-            y: 10
-          }
-        },
-        show: {
-          ready: true,
-          delay: 0
-        },
-        hide: {
-          delay: 1000,
-          fixed: true
-        },
-        api: {
-          onHide: function() {
-            var offset;
-            self.image.css({
-              "border-color": "#DDDDDD"
-            });
-            offset = graphItem.image.offset();
-            return self.image.animate({
-              left: offset.left,
-              top: offset.top,
-              width: graphItem.image.width(),
-              height: graphItem.image.height()
-            }, "fast", null, function() {
-              return self.fadeoutAndRemove();
-            });
-          }
-        }
-      }).qtip("show");
-      tip.qtip("api").elements.tooltip.selectable();
-      tip.qtip("api").elements.tooltip.mousedown(function(event) {
-        return event.stopPropagation();
-      });
-      return tip;
+      }, this)));
     };
     XYGraphDetail.prototype.fadeoutAndRemove = function() {
       var offset, self;
@@ -1234,33 +1195,31 @@
         return;
       }
       self = this;
-      if (this.tip) {
-        this.tip.qtip("destroy");
+      if (this.body) {
+        this.body.remove();
       }
-      this.image.css({
-        "background-color": "#DDDDDD"
-      });
       offset = this.graphItem.image.offset();
-      return this.image.animate({
+      return this.container.animate({
         left: offset.left,
         top: offset.top,
         width: self.graphItem.image.width(),
         height: self.graphItem.image.height()
-      }, "fast", null, function() {
-        return self.remove();
-      });
+      }, "fast", null, __bind(function() {
+        return this.remove();
+      }, this));
     };
     XYGraphDetail.prototype.remove = function() {
       if (!this.isAlive) {
         return;
       }
-      if (this.tip) {
-        this.tip.qtip("destroy");
+      if (this.body) {
+        this.body.remove();
       }
-      if (this.image) {
-        this.image.remove();
+      if (this.container) {
+        this.container.remove();
       }
-      return this.isAlive = false;
+      this.isAlive = false;
+      return this.graphItem.highlightIfInterested();
     };
     return XYGraphDetail;
   })();
@@ -1447,7 +1406,7 @@
     XYGraphItem.prototype.initImage = function() {
       var borderColor, h, self, w;
       self = this;
-      this.thumb = $(window).width() > 1600 ? this.getLargeImageInfo() : this.getMediumImageInfo();
+      this.thumb = $(window).width() > 1800 ? this.getLargeImageInfo() : this.getMediumImageInfo();
       w = Math.round(this.thumb.width * this.getImageScale());
       h = Math.round(this.thumb.height * this.getImageScale());
       borderColor = '#BBB';
@@ -1464,7 +1423,7 @@
         width: w,
         height: h,
         border: '1px solid ' + borderColor,
-        padding: 2,
+        padding: 3,
         cursor: 'pointer',
         'border-radius': 4,
         '-moz-border-radius': 4,
@@ -1480,6 +1439,7 @@
       }, this)).mousemove(__bind(function(event) {
         return event.preventDefault();
       }, this)).appendTo(this.bubble);
+      this.highlightIfInterested();
       this.triangle = $('<div/>').css({
         width: 0,
         height: 0,
@@ -1495,11 +1455,36 @@
         'z-index': self.getCaptionZIndex(),
         padding: '2px 6px 6px 12px',
         width: 130,
-        color: '#444',
+        color: '#666',
         'border-top': '1px solid ' + borderColor,
         'background-color': '#FFF',
         'font-size': '80%',
         'line-height': '1em'
+      });
+    };
+    XYGraphItem.prototype.interest = function() {
+      if (window.localStorage) {
+        return localStorage.setItem(this.getProductID(), '1');
+      }
+    };
+    XYGraphItem.prototype.uninterest = function() {
+      if (window.localStorage) {
+        return localStorage.removeItem(this.getProductID());
+      }
+    };
+    XYGraphItem.prototype.isInterested = function() {
+      if (window.localStorage) {
+        return localStorage.getItem(this.getProductID());
+      } else {
+        return null;
+      }
+    };
+    XYGraphItem.prototype.highlightIfInterested = function() {
+      this.image.css({
+        'background-color': this.isInterested() ? '#FFBF00' : '#FFF'
+      });
+      return this.bubble.css({
+        'z-index': this.getBubbleZIndex()
       });
     };
     XYGraphItem.prototype.onMouseover = function() {
@@ -1525,10 +1510,15 @@
       this.bubble.css({
         'z-index': 5000 + 1
       });
-      return this.caption.css({
+      this.caption.css({
         'z-index': 5000,
         'background-color': "#FFBF00",
-        'font-weight': 'bold'
+        'font-weight': 'bold',
+        color: '#444',
+        'border-top': '1px solid #444'
+      });
+      return this.image.css({
+        border: '1px solid #444'
       });
     };
     XYGraphItem.prototype.offlight = function() {
@@ -1537,10 +1527,15 @@
       this.bubble.css({
         "z-index": self.getBubbleZIndex()
       });
-      return this.caption.css({
+      this.caption.css({
         'z-index': self.getCaptionZIndex(),
         'background-color': '#FFF',
-        'font-weight': 'normal'
+        'font-weight': 'normal',
+        color: '#666',
+        'border-top': '1px solid #BBB'
+      });
+      return this.image.css({
+        border: '1px solid #BBB'
       });
     };
     XYGraphItem.prototype.isDetailShowing = function() {
@@ -1555,7 +1550,11 @@
       }
     };
     XYGraphItem.prototype.getBubbleZIndex = function() {
-      return this.getCaptionZIndex() + 1000;
+      if (this.isInterested()) {
+        return this.getCaptionZIndex() + 2000;
+      } else {
+        return this.getCaptionZIndex() + 1000;
+      }
     };
     XYGraphItem.prototype.getCaptionZIndex = function() {
       if (!this.getPvRankingLog()) {
@@ -1582,11 +1581,6 @@
         left: self.getBubbleLeft(x),
         top: self.getBubbleTop(y)
       });
-      return this.moveCaptionTo(x, y);
-    };
-    XYGraphItem.prototype.moveCaptionTo = function(x, y) {
-      var self;
-      self = this;
       return this.caption.css({
         left: self.getCaptionLeft(x),
         top: self.getCaptionTop(y)
@@ -1596,14 +1590,18 @@
       var self;
       self = this;
       this.bubble.stop();
-      return this.bubble.animate({
+      this.bubble.animate({
         left: self.getBubbleLeft(x),
         top: self.getBubbleTop(y)
       }, {
-        duration: "fast",
-        complete: __bind(function() {
-          return this.moveCaptionTo(x, y);
-        }, this)
+        duration: "fast"
+      });
+      this.caption.stop();
+      return this.caption.animate({
+        left: self.getCaptionLeft(x),
+        top: self.getCaptionTop(y)
+      }, {
+        duration: "fast"
       });
     };
     XYGraphItem.prototype.getBubbleLeft = function(x) {

@@ -167,11 +167,10 @@ class XYGraphItem
   #
   initImage: ->
     self = this
-    @thumb = if ($(window).width() > 1600) then @getLargeImageInfo() else @getMediumImageInfo()
+    @thumb = if ($(window).width() > 1800) then @getLargeImageInfo() else @getMediumImageInfo()
     w = Math.round(@thumb.width  * @getImageScale())
     h = Math.round(@thumb.height * @getImageScale())
     borderColor = '#BBB'
-
 
     @bubble = $('<div/>').css({
       position: 'absolute',
@@ -187,7 +186,7 @@ class XYGraphItem
       width: w
       height: h
       border: '1px solid ' + borderColor
-      padding: 2
+      padding: 3
       cursor: 'pointer'
       'border-radius': 4
       '-moz-border-radius': 4
@@ -203,6 +202,8 @@ class XYGraphItem
     ).mousemove( (event) =>
       event.preventDefault()
     ).appendTo(@bubble)
+
+    @highlightIfInterested()
 
     ## 吹出し
     @triangle = $('<div/>').css({
@@ -224,11 +225,33 @@ class XYGraphItem
       'z-index': self.getCaptionZIndex()
       padding: '2px 6px 6px 12px'
       width: 130
-      color: '#444'
+      color: '#666'
       'border-top': '1px solid ' + borderColor
       'background-color': '#FFF'
       'font-size': '80%'
       'line-height': '1em'
+    })
+
+  interest: ->
+    if window.localStorage
+      localStorage.setItem(@getProductID(), '1')
+
+  uninterest: ->
+    if window.localStorage
+      localStorage.removeItem(@getProductID())
+
+  isInterested: ->
+    if window.localStorage
+      localStorage.getItem(@getProductID())
+    else
+      null
+
+  highlightIfInterested: ->
+    @image.css({
+      'background-color': if @isInterested() then '#FFBF00' else '#FFF'
+    })
+    @bubble.css({
+      'z-index': @getBubbleZIndex()
     })
 
   onMouseover: ->
@@ -255,6 +278,11 @@ class XYGraphItem
       'z-index': 5000
       'background-color': "#FFBF00"
       'font-weight': 'bold'
+      color: '#444'
+      'border-top': '1px solid #444'
+    })
+    @image.css({
+      border: '1px solid #444'
     })
 
   offlight: ->
@@ -266,6 +294,11 @@ class XYGraphItem
       'z-index': self.getCaptionZIndex()
       'background-color': '#FFF'
       'font-weight': 'normal'
+      color: '#666'
+      'border-top': '1px solid #BBB'
+    })
+    @image.css({
+      border: '1px solid #BBB'
     })
 
   #
@@ -333,7 +366,10 @@ class XYGraphItem
   #   })
 
   getBubbleZIndex: ->
-    @getCaptionZIndex() + 1000
+    if @isInterested()
+      @getCaptionZIndex() + 2000
+    else
+      @getCaptionZIndex() + 1000
 
   getCaptionZIndex: ->
     return 0 if !@getPvRankingLog()
@@ -360,10 +396,6 @@ class XYGraphItem
       left: self.getBubbleLeft(x),
       top:  self.getBubbleTop(y)
     })
-    @moveCaptionTo(x, y)
-
-  moveCaptionTo: (x, y) ->
-    self = this
     @caption.css({
       left: self.getCaptionLeft(x)
       top:  self.getCaptionTop(y)
@@ -376,9 +408,14 @@ class XYGraphItem
       left: self.getBubbleLeft(x)
       top:  self.getBubbleTop(y)
     }, {
-      duration: "fast",
-      complete: =>
-        @moveCaptionTo(x, y)
+      duration: "fast"
+    })
+    @caption.stop()
+    @caption.animate({
+      left: self.getCaptionLeft(x)
+      top:  self.getCaptionTop(y)
+    }, {
+      duration: "fast"
     })
 
   getBubbleLeft: (x) ->

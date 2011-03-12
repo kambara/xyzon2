@@ -414,6 +414,7 @@
   KakakuSearch = (function() {
     KakakuSearch.COMPLETE = 'complete';
     KakakuSearch.ITEM_ELEMENT = 'item_element';
+    KakakuSearch.ERROR = 'error';
     function KakakuSearch() {
       this.dispatcher_ = $(this);
       this.maxPages = 0;
@@ -460,19 +461,35 @@
       xml = $(xml);
       error = xml.find("Error");
       if (error.length > 0) {
-        error.find("Message").each(function(i, elem) {
-          return $.log($(elem).text());
-        });
+        this.errors = [];
+        error.find("Message").each(__bind(function(i, elem) {
+          this.errors.push(this.errorJa($(elem).text()));
+          return $.log(this.errorJa($(elem).text()));
+        }, this));
         return true;
       } else {
         return false;
       }
+    };
+    KakakuSearch.errorMessagesTable = {
+      'ItemNotFound': '該当する商品がひとつもありませんでした。',
+      'TooManyItemsRequested': '制限値を超えたアイテム数のリクエストがありました。',
+      'InvalidParameterValue': 'パラメータの値が入っていないか、不正です。',
+      'No registration': '登録されていないアクセスキーです。',
+      'Exceeded daily maximum': '１日のアクセス制限を超えました。',
+      'Too many accesses': '制限を超えたアクセスがありました。',
+      'Blocked IP address': '禁止されているIPからのアクセスです。',
+      'InternalServerError': 'サーバは、処理を完了できませんでした。'
+    };
+    KakakuSearch.prototype.errorJa = function(msg) {
+      return KakakuSearch.errorMessagesTable[msg] || msg;
     };
     KakakuSearch.prototype.parseXML = function(xml, page) {
       var allPageNum, max, numOfResult;
       xml = $(xml);
       $.log('Parse page ' + page);
       if (this.isError(xml)) {
+        this.trigger(KakakuSearch.ERROR, [this.errors]);
         return;
       }
       if (page === 1) {
@@ -726,7 +743,7 @@
       params = Util.getLocationParams();
       this.subCategoryName = params['sub'] ? decodeURIComponent(params['sub']) : null;
       if (this.subCategoryName) {
-        $('#sub-category').append($('<span/>').html('&#155; ')).append($('<span/>').text(this.subCategoryName));
+        $('#current-sub-category').append($('<span/>').html('&#155; ')).append($('<span/>').text(this.subCategoryName));
       }
       this.categoryList = new CategoryList();
       this.graphItems = [];
@@ -754,6 +771,14 @@
       }, this)));
       kakakuSearch.bind(KakakuSearch.COMPLETE, (__bind(function() {
         return this.updateRecommendCategory();
+      }, this)));
+      kakakuSearch.bind(KakakuSearch.ERROR, (__bind(function(evt, errors) {
+        var err, _i, _len;
+        for (_i = 0, _len = errors.length; _i < _len; _i++) {
+          err = errors[_i];
+          $('#error-messages').append(err).show();
+        }
+        return this.onWindowResize();
       }, this)));
     }
     XYGraphArea.prototype.onAxisReset = function() {
@@ -1050,7 +1075,7 @@
     };
     XYGraphArea.prototype.appendRecommendCategories = function(names) {
       var container, key, keyword, link, name, params, _i, _len, _results;
-      container = $('#sub-category');
+      container = $('#sub-categories');
       params = Util.getLocationParams();
       keyword = params['keyword'];
       _results = [];
@@ -1066,7 +1091,7 @@
     };
     XYGraphArea.prototype.appendRecommendSubCategories = function(categoryKey, names) {
       var container, keyword, link, name, params, sub, _i, _len, _results;
-      container = $('#sub-category');
+      container = $('#sub-categories');
       params = Util.getLocationParams();
       keyword = params['keyword'];
       _results = [];

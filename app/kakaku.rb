@@ -68,7 +68,10 @@ module Kakaku
       url = make_url
       memcache = AppEngine::Memcache.new
       body = memcache.get(url)
-      return body if body
+      if body
+        puts "Hit memcache: #{url}"
+        return body
+      end
       body = AppEngine::URLFetch.fetch(url).body
       memcache.set(url, body, 24 * 60 * 60)
       body
@@ -80,7 +83,12 @@ module Kakaku
     end
 
     def format_params(params)
-      params[:ApiKey] = '4ab030273fef5eba1742c6fad2589358'
+      #k = 
+
+      keys = ['4ab030273fef5eba1742c6fad2589358',
+              '5f6d2ea7763105a2e5e4977fa85a1fdb',
+              '12b51b3615eaa26266c711f38445717e']
+      params[:ApiKey] = keys[rand(keys.length)]
       params[:HitNum] = '20'
       params.map {|k, v|
         [ k.to_s, rfc3986_escape(v.to_s) ].join("=")

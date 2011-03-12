@@ -5,7 +5,7 @@ class XYGraphArea
     params = Util.getLocationParams()
     @subCategoryName = if params['sub'] then decodeURIComponent(params['sub']) else null
     if @subCategoryName
-      $('#sub-category').append(
+      $('#current-sub-category').append(
         $('<span/>').html('&#155; ')
       ).append(
         $('<span/>').text(@subCategoryName)
@@ -43,6 +43,11 @@ class XYGraphArea
     ))
     kakakuSearch.bind(KakakuSearch.COMPLETE, ( =>
       @updateRecommendCategory()
+    ))
+    kakakuSearch.bind(KakakuSearch.ERROR, ( (evt, errors) =>
+      for err in errors
+        $('#error-messages').append(err).show()
+      @onWindowResize()
     ))
 
   onAxisReset: ->
@@ -377,7 +382,7 @@ class XYGraphArea
       @appendRecommendCategories(names)
 
   appendRecommendCategories: (names) ->
-    container = $('#sub-category')
+    container = $('#sub-categories')
     params = Util.getLocationParams()
     keyword = params['keyword']
     for name in names
@@ -388,7 +393,7 @@ class XYGraphArea
       container.append(link)
 
   appendRecommendSubCategories: (categoryKey, names) ->
-    container = $('#sub-category')
+    container = $('#sub-categories')
     params = Util.getLocationParams()
     keyword = params['keyword']
     for name in names

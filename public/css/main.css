@@ -111,7 +111,44 @@ form div.categories-box {
 }
 
 #y-menu-box select {
-    font-size: 110%;
+  font-size: 110%;
+}
+
+#error-messages {
+  background-color: #FF6666;
+  border: 1px solid #FF0000;
+  padding: 3px 10px;
+  color: #440000;
+  font-weight: bold;
+  display: none;
+}
+
+#examples {
+  margin: 50px auto;
+  font-size: 90%;
+  width: 350px;
+}
+
+#examples a {
+  margin-right: 0.5em;
+}
+
+#footer {
+  color: #555;
+  margin-top: 100px;
+  font-size: 80%;
+}
+
+#footer a {
+  color: #555;
+}
+
+#footer a.kakakucom {
+  margin-left: 0.5em;
+}
+
+#footer a.kakakucom img {
+  vertical-align: middle;
 }
 
 /*

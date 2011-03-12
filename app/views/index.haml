@@ -9,3 +9,24 @@
                       value = "商品検索")
     %br
     = haml :search_form_categories, :layout => false
+
+  #examples
+    例：
+    %a(href="/search?keyword=Macbook&category=Pc") Macbook
+    %a(href="http://www.xyzon.net/search?keyword=%E4%B8%80%E7%9C%BC&category=Camera") 一眼
+    %a(href="/search?keyword=ペンタブレット&category=Pc") ペンタブレット
+    %a(href="/search?keyword=ディスプレイ&category=Pc&sub=液晶モニタ・液晶ディスプレイ") ディスプレイ
+    %a(href="/search?keyword=プリンタ&category=Pc&sub=プリンタ") プリンタ
+    %a(href="/search?keyword=空気清浄機&category=Kaden") 空気清浄機
+    %a(href="http://localhost:8080/search?keyword=%E6%8E%83%E9%99%A4%E6%A9%9F&category=Kaden") 掃除機
+    %a(href="/search?keyword=電子辞書&category=Kaden&sub=電子辞書") 電子辞書
+    %a(href="/search?keyword=ヘッドホン&category=Kaden&sub=ヘッドホン・イヤホン") ヘッドホン
+
+  #footer
+    Created by
+    %a(href="http://sappari.org/") kambara
+    %a.kakakucom(href="http://apiblog.kakaku.com/")
+      %img(src="http://api.kakaku.com/images/api/135_17_gray.gif"
+                     alt="価格.com WEB サービス"
+                     title="価格.com　WEBサービス"
+                     border="0")

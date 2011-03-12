@@ -1,6 +1,7 @@
 class KakakuSearch
   @COMPLETE: 'complete'
   @ITEM_ELEMENT: 'item_element'
+  @ERROR: 'error'
 
   constructor: ->
     @dispatcher_ = $(this)
@@ -39,16 +40,34 @@ class KakakuSearch
     xml = $(xml)
     error = xml.find("Error")
     if (error.length > 0)
-      error.find("Message").each (i, elem) ->
-        $.log($(elem).text())
+      @errors = []
+      error.find("Message").each (i, elem) =>
+        @errors.push( @errorJa($(elem).text()) )
+        $.log(@errorJa($(elem).text()))
       true
     else
       false
 
+  @errorMessagesTable: {
+    'ItemNotFound': '該当する商品がひとつもありませんでした。'
+    'TooManyItemsRequested': '制限値を超えたアイテム数のリクエストがありました。'
+    'InvalidParameterValue': 'パラメータの値が入っていないか、不正です。'
+    'No registration': '登録されていないアクセスキーです。'
+    'Exceeded daily maximum': '１日のアクセス制限を超えました。'
+    'Too many accesses': '制限を超えたアクセスがありました。'
+    'Blocked IP address': '禁止されているIPからのアクセスです。'
+    'InternalServerError': 'サーバは、処理を完了できませんでした。'
+  }
+
+  errorJa: (msg) ->
+    KakakuSearch.errorMessagesTable[msg] || msg
+
   parseXML: (xml, page) ->
     xml = $(xml)
     $.log 'Parse page ' + page
-    return if @isError(xml)
+    if @isError(xml)
+      @trigger(KakakuSearch.ERROR, [@errors])
+      return
     if page is 1
       numOfResult = parseInt(xml.find("NumOfResult").text())
       allPageNum = Math.ceil(numOfResult/20)
